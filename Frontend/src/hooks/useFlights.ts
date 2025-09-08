@@ -108,8 +108,8 @@ export const useFlights = (options: UseFlightsOptions = {}) => {
         (async () => {
           try {
             const count = await flightService.getCount();
-            if (count < 200) {
-              await flightService.seed(500);
+            if (count < 40) {
+              await flightService.seed(40);
               await fetchFlights();
             }
           } catch {}

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from 'react-leaflet';
-import { Icon, LatLngExpression, LatLngBoundsExpression } from 'leaflet';
+import { Icon, LatLngExpression } from 'leaflet';
 import { Flight, RestrictedZone, Alert } from '../types/flight';
 import 'leaflet/dist/leaflet.css';
 
@@ -24,10 +24,8 @@ const getStatusColor = (status: string): string => {
   switch (status) {
     case 'on-time': return '#10b981';
     case 'delayed': return '#f59e0b';
-    case 'landed': return '#6b7280';
+    case 'landed': return '#3b82f6';
     case 'lost-comm': return '#ef4444';
-    case 'diverted': return '#8b5cf6';
-    case 'emergency': return '#dc2626';
     default: return '#3b82f6';
   }
 };
@@ -55,6 +53,24 @@ const createFlightIcon = (flight: Flight) => {
   return icon;
 };
 
+// Start marker icon (small green dot)
+const getStartIcon = () => {
+  const key = 'start:dot';
+  const cached = iconCache.get(key);
+  if (cached) return cached;
+  const icon = new Icon({
+    iconUrl: `data:image/svg+xml,${encodeURIComponent(`
+      <svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="6" cy="6" r="4" fill="#10b981" stroke="white" stroke-width="1" />
+      </svg>
+    `)}`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6]
+  });
+  iconCache.set(key, icon);
+  return icon;
+};
+
 const getZoneColor = (type: string): string => {
   switch (type) {
     case 'military': return '#dc2626';
@@ -71,14 +87,8 @@ export const FlightMap: React.FC<FlightMapProps> = ({
   onFlightClick,
   center
 }) => {
-  const computedCenter: [number, number] = center || (
-    flights.length > 0
-      ? [
-          flights.reduce((sum, f) => sum + f.latitude, 0) / flights.length,
-          flights.reduce((sum, f) => sum + f.longitude, 0) / flights.length,
-        ]
-      : [20.0, 77.0] // India region where backend seeds
-  );
+  // Lock the initial center so later renders don't recenter the map
+  const initialCenterRef = useRef<[number, number]>(center || [20.0, 77.0]);
   // Check for restricted zone violations
   useEffect(() => {
     if (!onAlertGenerated) return;
@@ -125,6 +135,13 @@ export const FlightMap: React.FC<FlightMapProps> = ({
       <>
         {visible.map(flight => (
           <div key={flight.id}>
+            {/* Start marker at first known path point */}
+            {Array.isArray(flight.path) && flight.path.length > 0 && (
+              <Marker
+                position={flight.path[0] as LatLngExpression}
+                icon={getStartIcon()}
+              />
+            )}
             <Marker
               position={[flight.latitude, flight.longitude]}
               icon={createFlightIcon(flight)}
@@ -184,7 +201,7 @@ export const FlightMap: React.FC<FlightMapProps> = ({
             </Marker>
             {flight.path && flight.path.length > 1 && (
               <Polyline
-                positions={flight.path as LatLngExpression[]}
+                positions={(flight.path as LatLngExpression[]).slice(-20)}
                 color={getStatusColor(flight.status)}
                 weight={2}
                 opacity={0.6}
@@ -196,14 +213,14 @@ export const FlightMap: React.FC<FlightMapProps> = ({
     );
   };
 
-  const worldBounds: LatLngBoundsExpression = [
-    [-85, -180],
-    [85, 180]
-  ];
+  // const worldBounds: LatLngBoundsExpression = [
+  //   [-85, -180],
+  //   [85, 180]
+  // ];
 
   return (
     <MapContainer
-      center={computedCenter}
+      center={initialCenterRef.current}
       zoom={3}
       className="h-full w-full z-0"
       zoomControl={true}
@@ -217,6 +234,8 @@ export const FlightMap: React.FC<FlightMapProps> = ({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
       />
+      {/* Startup animation to India */}
+      <StartupFocus target={[20.0, 77.0]} zoom={5} />
       
       {/* Restricted Zones */}
       {restrictedZones.map(zone => (
@@ -244,4 +263,23 @@ export const FlightMap: React.FC<FlightMapProps> = ({
       <VisibleFlights />
     </MapContainer>
   );
+};
+
+// Helper component to animate focus to India on mount (strictly once)
+const StartupFocus: React.FC<{ target: [number, number]; zoom: number }> = ({ target, zoom }) => {
+  const map = useMap();
+  const hasRunRef = useRef(false);
+  const targetRef = useRef(target);
+  const zoomRef = useRef(zoom);
+  useEffect(() => {
+    if (hasRunRef.current) return;
+    hasRunRef.current = true;
+    const t = setTimeout(() => {
+      try {
+        map.flyTo(targetRef.current, zoomRef.current, { animate: true, duration: 1.5 });
+      } catch {}
+    }, 300);
+    return () => clearTimeout(t);
+  }, []);
+  return null;
 };

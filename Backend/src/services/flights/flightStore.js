@@ -1,4 +1,5 @@
 const { randomUUID } = require("crypto");
+const { GEOGRAPHIC_BOUNDS } = require("../../utils/constants");
 
 class FlightStore {
   constructor() {
@@ -12,9 +13,9 @@ class FlightStore {
   }
 
   _newFlight() {
-    // Seed globally: latitude ~ -60 to 75 (avoid poles), longitude -180 to 180
-    const lat = this._rand(-60, 75);
-    const lng = this._rand(-180, 180);
+    // Seed within India bounds
+    const lat = this._rand(GEOGRAPHIC_BOUNDS.LAT_MIN, GEOGRAPHIC_BOUNDS.LAT_MAX);
+    const lng = this._rand(GEOGRAPHIC_BOUNDS.LNG_MIN, GEOGRAPHIC_BOUNDS.LNG_MAX);
 
     return {
       id: randomUUID().slice(0, 8),

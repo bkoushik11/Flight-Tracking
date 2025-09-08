@@ -15,10 +15,8 @@ interface FilterPanelProps {
 const statusOptions = [
   { value: 'on-time', label: 'On Time', color: '#10b981' },
   { value: 'delayed', label: 'Delayed', color: '#f59e0b' },
-  { value: 'landed', label: 'Landed', color: '#6b7280' },
-  { value: 'lost-comm', label: 'Lost Comm', color: '#ef4444' },
-  { value: 'diverted', label: 'Diverted', color: '#8b5cf6' },
-  { value: 'emergency', label: 'Emergency', color: '#dc2626' },
+  { value: 'landed', label: 'Landed', color: '#3b82f6' },
+  { value: 'lost-comm', label: 'Lost Communication', color: '#ef4444' },
 ];
 
 export const FilterPanel: React.FC<FilterPanelProps> = ({

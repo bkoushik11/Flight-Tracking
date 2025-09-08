@@ -48,5 +48,4 @@ server.listen(PORT, () => {
   console.log(`🚀 Flight Tracker Backend running on http://localhost:${PORT}`);
   console.log(`📡 WebSocket server ready for real-time updates`);
   console.log(`⏱️  Flight updates every ${TICK_MS}ms`);
-  console.log(`✈️  Simulating ${process.env.FLIGHT_COUNT || 8} flights`);
 });
