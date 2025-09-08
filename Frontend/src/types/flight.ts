@@ -18,7 +18,7 @@ export type FlightStatus =
   | 'on-time' 
   | 'delayed' 
   | 'landed' 
-  | 'lost-communication';
+  | 'lost-comm';
 
 export interface RestrictedZone {
   id: string;
