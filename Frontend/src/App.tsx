@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { FlightMap } from './components/FlightMap';
 import { FilterPanel } from './components/FilterPanel';
 import { AlertsPanel } from './components/AlertsPanel';
