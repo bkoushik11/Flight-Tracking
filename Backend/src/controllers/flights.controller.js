@@ -37,17 +37,6 @@ class FlightsController {
     }
   }
 
-  async seedFlights(req, res) {
-    try {
-      const countRaw = req.body && req.body.count;
-      const parsedCount = Number(countRaw);
-      const count = Number.isFinite(parsedCount) && parsedCount > 0 ? parsedCount : null;
-      const flights = flightService.seedFlights(count);
-      res.json({ message: "Flights seeded successfully", count: flights.length, flights });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to seed flights", message: error.message });
-    }
-  }
 
   async getFlightCount(_req, res) {
     try {

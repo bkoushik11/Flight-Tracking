@@ -11,7 +11,6 @@ interface StatusBarProps {
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
-  isConnected,
   totalFlights,
   filteredFlights,
   lastUpdate,
