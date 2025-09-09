@@ -61,7 +61,6 @@ Flight Tracker is a full-stack application that simulates real-time aircraft tra
 - **Leaflet** - Interactive maps
 - **React-Leaflet** - React integration for Leaflet
 - **Socket.IO Client** - Real-time communication
-- **Lucide React** - Icons
 
 ## 📁 Project Structure
 
