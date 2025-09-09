@@ -68,6 +68,11 @@ class FlightsGateway {
     });
   }
 
+  // Broadcast alerts to all connected clients
+  broadcastAlerts(alerts) {
+    this.io.emit("alerts", alerts);
+  }
+
   _flightRoom(id) {
     return `flight:${id}`;
   }

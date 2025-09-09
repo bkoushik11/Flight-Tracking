@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Plane, MapPin, Clock, Gauge, Compass, AlertTriangle } from 'lucide-react';
+import { X, Plane, MapPin, Clock, Gauge, Compass, AlertTriangle, Navigation, Route, Target } from 'lucide-react';
 import { Flight } from '../types/flight';
 
 interface FlightDetailsProps {
@@ -64,26 +64,65 @@ export const FlightDetails: React.FC<FlightDetailsProps> = ({ flight, onClose })
 
         {/* Route Information */}
         <div className="p-6">
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-              <MapPin size={20} className="mr-2" />
-              Route
+          <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-6 border border-blue-200">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+              <Route size={20} className="mr-2 text-blue-600" />
+              Flight Route
             </h3>
             <div className="flex items-center justify-between">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-900">{flight.origin}</div>
-                <div className="text-sm text-gray-600">Origin</div>
-              </div>
-              <div className="flex-1 mx-4">
-                <div className="h-0.5 bg-gray-300 relative">
-                  <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                    <Plane size={16} className="text-blue-600" />
+              <div className="text-center flex-1">
+                <div className="bg-white rounded-lg p-3 shadow-sm border">
+                  <div className="text-lg font-bold text-gray-900">{flight.origin}</div>
+                  <div className="text-sm text-gray-600 flex items-center justify-center mt-1">
+                    <MapPin size={14} className="mr-1" />
+                    Origin
                   </div>
                 </div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-900">{flight.destination}</div>
-                <div className="text-sm text-gray-600">Destination</div>
+              <div className="flex-1 mx-6">
+                <div className="h-1 bg-gradient-to-r from-blue-400 to-green-400 rounded-full relative">
+                  <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                    <div className="bg-white rounded-full p-1 shadow-md border-2 border-blue-500">
+                      <Plane size={16} className="text-blue-600" />
+                    </div>
+                  </div>
+                </div>
+                <div className="text-center mt-2">
+                  <div className="text-xs text-gray-500">En Route</div>
+                </div>
+              </div>
+              <div className="text-center flex-1">
+                <div className="bg-white rounded-lg p-3 shadow-sm border border-green-200">
+                  <div className="text-lg font-bold text-green-700 flex items-center justify-center">
+                    <Target size={16} className="mr-1" />
+                    {flight.destination}
+                  </div>
+                  <div className="text-sm text-gray-600 flex items-center justify-center mt-1">
+                    <Navigation size={14} className="mr-1" />
+                    Destination
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Destination Details */}
+          <div className="bg-green-50 rounded-lg p-4 mb-6 border border-green-200">
+            <h3 className="font-semibold text-green-800 mb-3 flex items-center">
+              <Target size={18} className="mr-2" />
+              Heading to Destination
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white rounded-lg p-3 border border-green-100">
+                <div className="text-sm text-gray-600 mb-1">Destination Airport</div>
+                <div className="text-lg font-semibold text-green-700">{flight.destination}</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 border border-green-100">
+                <div className="text-sm text-gray-600 mb-1">Current Heading</div>
+                <div className="text-lg font-semibold text-green-700 flex items-center">
+                  <Compass size={16} className="mr-1" />
+                  {flight.heading}°
+                </div>
               </div>
             </div>
           </div>

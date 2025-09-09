@@ -203,6 +203,21 @@ export const useFlights = (options: UseFlightsOptions = {}) => {
       }
     });
 
+    // Handle real-time alerts
+    socket.on('alerts', (newAlerts: any[]) => {
+      const mappedAlerts: Alert[] = newAlerts.map((alert: any) => ({
+        ...alert,
+        timestamp: new Date(alert.timestamp)
+      }));
+      
+      setAlerts(prev => {
+        // Add new alerts, avoiding duplicates
+        const existingIds = new Set(prev.map(a => a.id));
+        const uniqueNewAlerts = mappedAlerts.filter(a => !existingIds.has(a.id));
+        return [...uniqueNewAlerts, ...prev];
+      });
+    });
+
     return () => {
       if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
       socket.disconnect();

@@ -53,23 +53,6 @@ const createFlightIcon = (flight: Flight) => {
   return icon;
 };
 
-// Start marker icon (small green dot)
-const getStartIcon = () => {
-  const key = 'start:dot';
-  const cached = iconCache.get(key);
-  if (cached) return cached;
-  const icon = new Icon({
-    iconUrl: `data:image/svg+xml,${encodeURIComponent(`
-      <svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="6" cy="6" r="4" fill="#10b981" stroke="white" stroke-width="1" />
-      </svg>
-    `)}`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6]
-  });
-  iconCache.set(key, icon);
-  return icon;
-};
 
 const getZoneColor = (type: string): string => {
   switch (type) {
@@ -135,13 +118,6 @@ export const FlightMap: React.FC<FlightMapProps> = ({
       <>
         {visible.map(flight => (
           <div key={flight.id}>
-            {/* Start marker at first known path point */}
-            {Array.isArray(flight.path) && flight.path.length > 0 && (
-              <Marker
-                position={flight.path[0] as LatLngExpression}
-                icon={getStartIcon()}
-              />
-            )}
             <Marker
               position={[flight.latitude, flight.longitude]}
               icon={createFlightIcon(flight)}
@@ -160,26 +136,32 @@ export const FlightMap: React.FC<FlightMapProps> = ({
                       {flight.status.toUpperCase()}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="space-y-2 text-sm">
+                    <div className="bg-green-50 p-2 rounded border border-green-200">
+                      <div className="font-medium text-green-800 mb-1">Destination</div>
+                      <div className="text-green-700 font-semibold">{flight.destination}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Route:</span>
+                      <p className="text-gray-700">{flight.origin} → {flight.destination}</p>
+                    </div>
                     <div>
                       <span className="font-medium">Aircraft:</span>
                       <p>{flight.aircraft}</p>
                     </div>
-                    <div>
-                      <span className="font-medium">Route:</span>
-                      <p>{flight.origin} → {flight.destination}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Altitude:</span>
-                      <p>{flight.altitude.toLocaleString()} ft</p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Speed:</span>
-                      <p>{flight.speed} kts</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="font-medium">Altitude:</span>
+                        <p>{flight.altitude.toLocaleString()} ft</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Speed:</span>
+                        <p>{flight.speed} kts</p>
+                      </div>
                     </div>
                     <div>
                       <span className="font-medium">Heading:</span>
-                      <p>{flight.heading}°</p>
+                      <p>{flight.heading}° (towards destination)</p>
                     </div>
                     <div>
                       <span className="font-medium">Last Update:</span>

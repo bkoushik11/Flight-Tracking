@@ -1,4 +1,4 @@
-import { httpGet, httpPost } from '../shared/lib/http';
+import { httpGet, httpPost, httpDelete } from '../shared/lib/http';
 import type { Alert, RestrictedZone, Flight } from '../types/flight';
 
 export interface FlightApiResponse {
@@ -97,33 +97,38 @@ export class FlightService {
   }
 
   async getRestrictedZones(): Promise<RestrictedZone[]> {
-    // Static mock zones until backend implements this
-    const zones: RestrictedZone[] = [
-      {
-        id: 'rz-ny-mil',
-        name: 'NY Military Zone',
-        center: [40.75, -73.9],
-        radius: 15000,
-        type: 'military',
-      },
-      {
-        id: 'rz-ewr-airport',
-        name: 'EWR Class B',
-        center: [40.6895, -74.1745],
-        radius: 12000,
-        type: 'airport',
-      },
-    ];
-    return zones;
+    try {
+      return await httpGet<RestrictedZone[]>('/alerts/zones');
+    } catch (error) {
+      console.error('Error fetching restricted zones:', error);
+      // Fallback to empty array if backend is not available
+      return [];
+    }
   }
 
   async getAlerts(): Promise<Alert[]> {
-    return localAlerts;
+    try {
+      const alerts = await httpGet<Alert[]>('/alerts');
+      return alerts.map(alert => ({
+        ...alert,
+        timestamp: new Date(alert.timestamp)
+      }));
+    } catch (error) {
+      console.error('Error fetching alerts:', error);
+      return localAlerts;
+    }
   }
 
   async dismissAlert(alertId: string): Promise<{ ok: true }> {
-    localAlerts = localAlerts.filter((a) => a.id !== alertId);
-    return { ok: true };
+    try {
+      await httpDelete(`/alerts/${alertId}`);
+      return { ok: true };
+    } catch (error) {
+      console.error('Error dismissing alert:', error);
+      // Fallback to local removal
+      localAlerts = localAlerts.filter((a) => a.id !== alertId);
+      return { ok: true };
+    }
   }
 
   // Helper for components to add alerts (e.g., from map zone violations)

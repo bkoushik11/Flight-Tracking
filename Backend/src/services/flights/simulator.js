@@ -1,5 +1,6 @@
 const { EventEmitter } = require("events");
 const flightService = require("./flightService");
+const alertService = require("../alerts/alertService");
 
 class FlightSimulator extends EventEmitter {
   constructor() {
@@ -34,7 +35,15 @@ class FlightSimulator extends EventEmitter {
 
   tick() {
     const updatedFlights = flightService.updateFlightPositions();
+    
+    // Process alerts for the updated flights
+    const newAlerts = alertService.processFlights(updatedFlights);
+    
+    // Emit both flight updates and any new alerts
     this.emit("tick", updatedFlights);
+    if (newAlerts.length > 0) {
+      this.emit("alerts", newAlerts);
+    }
   }
 
   getFlights() {

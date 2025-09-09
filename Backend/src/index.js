@@ -22,6 +22,11 @@ simulator.on("tick", (flights) => {
   flightsGateway.broadcastFlightUpdate(flights);
 });
 
+// Handle alert events
+simulator.on("alerts", (alerts) => {
+  flightsGateway.broadcastAlerts(alerts);
+});
+
 // Start the simulator loop
 simulator.start(TICK_MS);
 
