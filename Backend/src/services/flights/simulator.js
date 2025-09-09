@@ -56,11 +56,6 @@ class FlightSimulator extends EventEmitter {
     return flights;
   }
 
-  seed(count = null) {
-    const flights = flightService.seedFlights(count);
-    this.emit("tick", flights);
-    return flights;
-  }
 
   isActive() {
     return this.isRunning;
