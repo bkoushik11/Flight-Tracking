@@ -13,8 +13,6 @@ const getStatusColor = (status: string): string => {
     case 'delayed': return 'text-yellow-600 bg-yellow-100';
     case 'landed': return 'text-gray-600 bg-gray-100';
     case 'lost-comm': return 'text-red-600 bg-red-100';
-    case 'diverted': return 'text-purple-600 bg-purple-100';
-    case 'emergency': return 'text-red-700 bg-red-200';
     default: return 'text-blue-600 bg-blue-100';
   }
 };
