@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, LayersControl } from 'react-leaflet';
 import { Icon, LatLngExpression } from 'leaflet';
 import { Flight, RestrictedZone, Alert } from '../types/flight';
 import 'leaflet/dist/leaflet.css';
@@ -183,7 +183,7 @@ export const FlightMap: React.FC<FlightMapProps> = ({
             </Marker>
             {flight.path && flight.path.length > 1 && (
               <Polyline
-                positions={(flight.path as LatLngExpression[]).slice(-20)}
+                positions={(flight.path as LatLngExpression[]).slice(-50)}
                 color={getStatusColor(flight.status)}
                 weight={2}
                 opacity={0.6}
@@ -212,10 +212,35 @@ export const FlightMap: React.FC<FlightMapProps> = ({
       zoomSnap={0.5}
       zoomDelta={0.5}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-      />
+      <LayersControl position="topright">
+        <LayersControl.BaseLayer checked name="CARTO Voyager">
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          />
+        </LayersControl.BaseLayer>
+
+        <LayersControl.BaseLayer name="OpenStreetMap Standard">
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        </LayersControl.BaseLayer>
+
+        <LayersControl.BaseLayer name="Esri World Imagery (Satellite)">
+          <TileLayer
+            attribution='Tiles &copy; Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          />
+        </LayersControl.BaseLayer>
+
+        <LayersControl.BaseLayer name="OpenTopoMap (Terrain)">
+          <TileLayer
+            attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
+            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+          />
+        </LayersControl.BaseLayer>
+      </LayersControl>
       {/* Startup animation to India */}
       <StartupFocus target={[20.0, 77.0]} zoom={5} />
       
