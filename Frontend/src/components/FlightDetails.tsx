@@ -1,22 +1,21 @@
 import React from 'react';
 import { X, Plane, MapPin, Clock, Gauge, Compass, AlertTriangle, Navigation, Route, Target } from 'lucide-react';
 import { Flight } from '../types/flight';
+import { getStatusBgColor, formatAltitude, formatSpeed, formatHeading } from '../shared/constants';
 
+/**
+ * Props for the FlightDetails component
+ */
 interface FlightDetailsProps {
   flight: Flight | null;
   onClose: () => void;
 }
 
-const getStatusColor = (status: string): string => {
-  switch (status) {
-    case 'on-time': return 'text-green-600 bg-green-100';
-    case 'delayed': return 'text-yellow-600 bg-yellow-100';
-    case 'landed': return 'text-gray-600 bg-gray-100';
-    case 'lost-comm': return 'text-red-600 bg-red-100';
-    default: return 'text-blue-600 bg-blue-100';
-  }
-};
-
+/**
+ * Get appropriate icon for flight status
+ * @param status - Flight status
+ * @returns JSX element with appropriate icon
+ */
 const getStatusIcon = (status: string) => {
   switch (status) {
     case 'emergency':
@@ -27,6 +26,18 @@ const getStatusIcon = (status: string) => {
   }
 };
 
+/**
+ * FlightDetails component
+ * Displays detailed information about a selected flight in a modal
+ * 
+ * Features:
+ * - Comprehensive flight information display
+ * - Route visualization with origin/destination
+ * - Real-time flight metrics (altitude, speed, heading)
+ * - Position coordinates
+ * - Status-based styling
+ * - Responsive modal design
+ */
 export const FlightDetails: React.FC<FlightDetailsProps> = ({ flight, onClose }) => {
   if (!flight) return null;
 
@@ -54,7 +65,7 @@ export const FlightDetails: React.FC<FlightDetailsProps> = ({ flight, onClose })
 
         {/* Status Badge */}
         <div className="px-6 pt-4">
-          <div className={`inline-flex items-center space-x-2 px-3 py-2 rounded-full ${getStatusColor(flight.status)}`}>
+          <div className={`inline-flex items-center space-x-2 px-3 py-2 rounded-full ${getStatusBgColor(flight.status)}`}>
             {getStatusIcon(flight.status)}
             <span className="font-medium capitalize">{flight.status.replace('-', ' ')}</span>
           </div>
@@ -131,23 +142,23 @@ export const FlightDetails: React.FC<FlightDetailsProps> = ({ flight, onClose })
               <div className="flex items-center justify-center mb-2">
                 <Gauge className="text-blue-600" size={20} />
               </div>
-              <div className="text-2xl font-bold text-gray-900">{flight.altitude.toLocaleString()}</div>
-              <div className="text-sm text-gray-600">Altitude (ft)</div>
+              <div className="text-2xl font-bold text-gray-900">{formatAltitude(flight.altitude)}</div>
+              <div className="text-sm text-gray-600">Altitude</div>
             </div>
             
             <div className="bg-white border rounded-lg p-4 text-center">
               <div className="flex items-center justify-center mb-2">
                 <Gauge className="text-green-600" size={20} />
               </div>
-              <div className="text-2xl font-bold text-gray-900">{flight.speed}</div>
-              <div className="text-sm text-gray-600">Speed (kts)</div>
+              <div className="text-2xl font-bold text-gray-900">{formatSpeed(flight.speed)}</div>
+              <div className="text-sm text-gray-600">Speed</div>
             </div>
             
             <div className="bg-white border rounded-lg p-4 text-center">
               <div className="flex items-center justify-center mb-2">
                 <Compass className="text-purple-600" size={20} />
               </div>
-              <div className="text-2xl font-bold text-gray-900">{flight.heading}°</div>
+              <div className="text-2xl font-bold text-gray-900">{formatHeading(flight.heading)}</div>
               <div className="text-sm text-gray-600">Heading</div>
             </div>
             

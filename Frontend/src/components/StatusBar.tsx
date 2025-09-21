@@ -1,6 +1,9 @@
 import React from 'react';
 import { Wifi, WifiOff, Plane, RefreshCw } from 'lucide-react';
 
+/**
+ * Props for the StatusBar component
+ */
 interface StatusBarProps {
   isConnected: boolean;
   totalFlights: number;
@@ -10,6 +13,17 @@ interface StatusBarProps {
   onRefresh?: () => void;
 }
 
+/**
+ * StatusBar component
+ * Displays application status information at the bottom of the screen
+ * 
+ * Features:
+ * - Connection status indicator
+ * - Flight count display
+ * - Last update timestamp
+ * - Error message display
+ * - Manual refresh functionality
+ */
 export const StatusBar: React.FC<StatusBarProps> = ({
   totalFlights,
   filteredFlights,

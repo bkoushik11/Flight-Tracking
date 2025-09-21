@@ -1,6 +1,16 @@
 import React from 'react';
 import { Plane } from 'lucide-react';
 
+/**
+ * LoadingSpinner component
+ * Displays a loading animation while the application is initializing
+ * 
+ * Features:
+ * - Animated airplane icon
+ * - Spinning loading ring
+ * - Informative loading message
+ * - Full-screen overlay design
+ */
 export const LoadingSpinner: React.FC = () => {
   return (
     <div className="h-screen flex items-center justify-center bg-gray-50">

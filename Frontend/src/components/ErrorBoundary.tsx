@@ -1,15 +1,33 @@
 import  { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
+/**
+ * Props for the ErrorBoundary component
+ */
 interface Props {
   children: ReactNode;
 }
 
+/**
+ * State for the ErrorBoundary component
+ */
 interface State {
   hasError: boolean;
   error?: Error;
 }
 
+/**
+ * ErrorBoundary component
+ * Catches JavaScript errors anywhere in the child component tree
+ * and displays a fallback UI instead of crashing the entire app
+ * 
+ * Features:
+ * - Error catching and logging
+ * - User-friendly error display
+ * - Retry functionality
+ * - Technical details for debugging
+ * - Graceful error recovery
+ */
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false

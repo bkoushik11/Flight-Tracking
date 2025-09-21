@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Sliders, Filter } from 'lucide-react';
+import { FLIGHT_STATUSES, getStatusColor, formatFlightStatus } from '../shared/constants';
 
+/**
+ * Props for the FilterPanel component
+ */
 interface FilterPanelProps {
   filters: {
     minAltitude: number;
@@ -12,85 +16,116 @@ interface FilterPanelProps {
   onToggle: () => void;
 }
 
-const statusOptions = [
-  { value: 'on-time', label: 'On Time', color: '#10b981' },
-  { value: 'delayed', label: 'Delayed', color: '#f59e0b' },
-  { value: 'landed', label: 'Landed', color: '#3b82f6' },
-  { value: 'lost-comm', label: 'Lost Communication', color: '#ef4444' },
-];
+/**
+ * Status options for filtering flights
+ * Generated from shared constants for consistency
+ */
+const STATUS_OPTIONS = Object.values(FLIGHT_STATUSES).map(status => ({
+  value: status,
+  label: formatFlightStatus(status),
+  color: getStatusColor(status)
+}));
 
+/**
+ * Default filter values
+ */
+const DEFAULT_FILTERS = {
+  minAltitude: 0,
+  maxAltitude: 50000,
+  statuses: []
+};
+
+/**
+ * FilterPanel component
+ * Provides filtering controls for flight data
+ * 
+ * Features:
+ * - Altitude range filtering with sliders
+ * - Flight status filtering with checkboxes
+ * - Real-time filter application
+ * - Reset functionality
+ * - Collapsible panel design
+ */
 export const FilterPanel: React.FC<FilterPanelProps> = ({
   filters,
   onFiltersChange,
   isOpen,
   onToggle
 }) => {
-  const handleStatusToggle = (status: string) => {
+  const handleStatusToggle = useCallback((status: string) => {
     const newStatuses = filters.statuses.includes(status)
       ? filters.statuses.filter(s => s !== status)
       : [...filters.statuses, status];
     
     onFiltersChange({ ...filters, statuses: newStatuses });
-  };
+  }, [filters, onFiltersChange]);
+
+  const handleAltitudeChange = useCallback((field: 'minAltitude' | 'maxAltitude', value: number) => {
+    onFiltersChange({ ...filters, [field]: value });
+  }, [filters, onFiltersChange]);
+
+  const resetFilters = useCallback(() => {
+    onFiltersChange(DEFAULT_FILTERS);
+  }, [onFiltersChange]);
 
   return (
     <div className="relative">
       <button
         onClick={onToggle}
-        className="flex items-center space-x-2 bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors"
+        className="flex items-center space-x-2 bg-slate-800 text-white px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors"
       >
-        <Filter size={20} />
-        <span>Filters</span>
+        <Filter size={18} />
+        <span className="text-sm">Filters</span>
       </button>
 
       {isOpen && (
-        <div className="absolute top-12 left-0 bg-white rounded-lg shadow-xl border p-6 w-80 z-[4000]">
-          <div className="flex items-center space-x-2 mb-4">
-            <Sliders size={20} />
-            <h3 className="font-bold text-lg">Flight Filters</h3>
+        <div className="absolute top-10 left-0 bg-white rounded-lg shadow-xl border p-4 w-72 z-[4000]">
+          <div className="flex items-center space-x-2 mb-3">
+            <Sliders size={18} />
+            <h3 className="font-bold text-base">Flight Filters</h3>
           </div>
 
           {/* Altitude Filter */}
-          <div className="mb-6">
-            <h4 className="font-medium mb-3">Altitude Range (feet)</h4>
-            <div className="space-y-3">
+          <div className="mb-4">
+            <h4 className="font-medium mb-2 text-sm">Altitude Range (feet)</h4>
+            <div className="space-y-2">
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Minimum</label>
+                <label className="block text-xs text-gray-600 mb-1">Minimum</label>
                 <input
                   type="range"
                   min="0"
                   max="50000"
                   step="1000"
                   value={filters.minAltitude}
-                  onChange={(e) => onFiltersChange({ ...filters, minAltitude: parseInt(e.target.value) })}
+                  onChange={(e) => handleAltitudeChange('minAltitude', parseInt(e.target.value))}
                   className="w-full"
                 />
-                <span className="text-sm text-gray-500">{filters.minAltitude.toLocaleString()} ft</span>
+                <span className="text-xs text-gray-500">{filters.minAltitude.toLocaleString()} ft</span>
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Maximum</label>
+                <label className="block text-xs text-gray-600 mb-1">Maximum</label>
                 <input
                   type="range"
                   min="0"
                   max="50000"
                   step="1000"
                   value={filters.maxAltitude}
-                  onChange={(e) => onFiltersChange({ ...filters, maxAltitude: parseInt(e.target.value) })}
+                  onChange={(e) => handleAltitudeChange('maxAltitude', parseInt(e.target.value))}
                   className="w-full"
                 />
-                <span className="text-sm text-gray-500">{filters.maxAltitude.toLocaleString()} ft</span>
+                <span className="text-xs text-gray-500">{filters.maxAltitude.toLocaleString()} ft</span>
               </div>
             </div>
           </div>
 
           {/* Status Filter */}
           <div>
-            <h4 className="font-medium mb-3">Flight Status</h4>
-            <div className="space-y-2">
-              {statusOptions.map(status => (
+            <h4 className="font-medium mb-2 text-sm">Flight Status</h4>
+            <div className="space-y-1">
+              {STATUS_OPTIONS.map(status => (
                 <label
                   key={status.value}
-                  className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                  className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-sm"
                 >
                   <input
                     type="checkbox"
@@ -99,23 +134,19 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
                     className="rounded"
                   />
                   <div
-                    className="w-3 h-3 rounded-full"
+                    className="w-2 h-2 rounded-full"
                     style={{ backgroundColor: status.color }}
                   />
-                  <span className="text-sm">{status.label}</span>
+                  <span>{status.label}</span>
                 </label>
               ))}
             </div>
           </div>
 
-          <div className="mt-4 pt-4 border-t">
+          <div className="mt-3 pt-3 border-t">
             <button
-              onClick={() => onFiltersChange({
-                minAltitude: 0,
-                maxAltitude: 50000,
-                statuses: []
-              })}
-              className="text-sm text-blue-600 hover:text-blue-800"
+              onClick={resetFilters}
+              className="text-xs text-blue-600 hover:text-blue-800"
             >
               Reset All Filters
             </button>

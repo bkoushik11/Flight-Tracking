@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { FlightMap } from './components/FlightMap';
 import { FilterPanel } from './components/FilterPanel';
 import { AlertsPanel } from './components/AlertsPanel';
@@ -10,7 +10,12 @@ import { useFlights } from './hooks/useFlights';
 import { Flight, Alert } from './types/flight';
 import { MapPin } from 'lucide-react';
 
-// Zones now come from the hook's service
+// Constants for better maintainability
+const DEFAULT_FILTERS = {
+  minAltitude: 0,
+  maxAltitude: 50000,
+  statuses: [] as string[]
+};
 
 function App() {
   const {
@@ -25,25 +30,23 @@ function App() {
     fetchFlights
   } = useFlights();
 
-  const [filters, setFilters] = useState({
-    minAltitude: 0,
-    maxAltitude: 50000,
-    statuses: [] as string[]
-  });
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
   const [localAlerts, setLocalAlerts] = useState<Alert[]>([]);
 
-  // Combine server alerts with local alerts
-  const allAlerts = [...alerts, ...localAlerts];
+  // Memoized filtered flights for better performance
+  const filteredFlights = useMemo(() => {
+    return flights.filter(flight => {
+      const altitudeInRange = flight.altitude >= filters.minAltitude && flight.altitude <= filters.maxAltitude;
+      const statusMatches = filters.statuses.length === 0 || filters.statuses.includes(flight.status);
+      return altitudeInRange && statusMatches;
+    });
+  }, [flights, filters]);
 
-  // Filter flights based on current filters
-  const filteredFlights = flights.filter(flight => {
-    const altitudeInRange = flight.altitude >= filters.minAltitude && flight.altitude <= filters.maxAltitude;
-    const statusMatches = filters.statuses.length === 0 || filters.statuses.includes(flight.status);
-    return altitudeInRange && statusMatches;
-  });
+  // Memoized combined alerts
+  const allAlerts = useMemo(() => [...alerts, ...localAlerts], [alerts, localAlerts]);
 
   const handleAlertGenerated = useCallback((alert: Alert) => {
     setLocalAlerts(prev => {
@@ -56,13 +59,15 @@ function App() {
   }, []);
 
   const handleDismissAlert = useCallback(async (alertId: string) => {
-    // Try to dismiss from server first
-    await dismissAlert(alertId);
-    // Also remove from local alerts
-    setLocalAlerts(prev => prev.filter(alert => alert.id !== alertId));
+    try {
+      await dismissAlert(alertId);
+      setLocalAlerts(prev => prev.filter(alert => alert.id !== alertId));
+    } catch (error) {
+      console.error('Failed to dismiss alert:', error);
+    }
   }, [dismissAlert]);
 
-  const handleFiltersChange = useCallback((newFilters: typeof filters) => {
+  const handleFiltersChange = useCallback((newFilters: typeof DEFAULT_FILTERS) => {
     setFilters(newFilters);
     fetchFlights(newFilters);
   }, [fetchFlights]);
@@ -71,45 +76,57 @@ function App() {
     refreshData(filters);
   }, [refreshData, filters]);
 
+  const toggleFilters = useCallback(() => {
+    setShowFilters(prev => !prev);
+  }, []);
+
+  const toggleAlerts = useCallback(() => {
+    setShowAlerts(prev => !prev);
+  }, []);
+
+  const closeFlightDetails = useCallback(() => {
+    setSelectedFlight(null);
+  }, []);
+
   if (loading) {
     return <LoadingSpinner />;
   }
 
   return (
     <ErrorBoundary>
-      <div className="h-screen flex flex-col">
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b px-6 py-4 z-[3000] relative">
+      <div className="h-screen flex flex-col bg-gray-50">
+        {/* Simplified Header */}
+        <header className="bg-white shadow-sm border-b px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-blue-100 rounded-lg">
-                <MapPin className="text-blue-600" size={28} />
+                <MapPin className="text-blue-600" size={24} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Live Flight Tracker</h1>
-                <p className="text-sm text-gray-600">Real-time aircraft monitoring system</p>
+                <h1 className="text-xl font-bold text-gray-900">Live Flight Tracker</h1>
+                <p className="text-sm text-gray-600">Real-time aircraft monitoring</p>
               </div>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
               <FilterPanel
                 filters={filters}
                 onFiltersChange={handleFiltersChange}
                 isOpen={showFilters}
-                onToggle={() => setShowFilters(!showFilters)}
+                onToggle={toggleFilters}
               />
               <AlertsPanel
                 alerts={allAlerts}
                 onDismissAlert={handleDismissAlert}
                 isOpen={showAlerts}
-                onToggle={() => setShowAlerts(!showAlerts)}
+                onToggle={toggleAlerts}
               />
             </div>
           </div>
         </header>
 
         {/* Main Map Area */}
-        <main className="flex-1 relative">
+        <main className="flex-1">
           <FlightMap
             flights={filteredFlights}
             restrictedZones={restrictedZones}
@@ -131,7 +148,7 @@ function App() {
         {/* Flight Details Modal */}
         <FlightDetails
           flight={selectedFlight}
-          onClose={() => setSelectedFlight(null)}
+          onClose={closeFlightDetails}
         />
       </div>
     </ErrorBoundary>

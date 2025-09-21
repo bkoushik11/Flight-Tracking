@@ -15,5 +15,7 @@ router.get("/:id", flightsController.getFlightById);
 // Reset all flights (admin endpoint)
 router.post("/reset", flightsController.resetFlights);
 
+// Seed flights (admin endpoint)
+router.post("/seed", flightsController.seedFlights);
 
 module.exports = router;

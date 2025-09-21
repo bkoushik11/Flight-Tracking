@@ -161,7 +161,7 @@ NODE_ENV=development
 
 # Flight Simulation
 TICK_MS=3000
-FLIGHT_COUNT=200
+FLIGHT_COUNT=80
 
 # CORS
 CORS_ORIGIN=*
@@ -173,7 +173,7 @@ CORS_ORIGIN=*
 |----------|---------|-------------|
 | `PORT` | 5000 | Backend server port |
 | `TICK_MS` | 3000 | Flight update interval (ms) |
-| `FLIGHT_COUNT` | 40 | Number of simulated flights |
+| `FLIGHT_COUNT` | 80 | Number of simulated flights |
 | `CORS_ORIGIN` | * | Allowed CORS origins |
 
 ## 🎮 Usage

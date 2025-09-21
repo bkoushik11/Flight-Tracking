@@ -1,12 +1,30 @@
 const { v4: uuidv4 } = require('uuid');
+const { calculateDistance } = require('../../utils/geoUtils');
 
+/**
+ * AlertService - Manages flight alerts and restricted zone monitoring
+ * 
+ * This service handles:
+ * - Lost communication alerts
+ * - Restricted zone entry/exit alerts
+ * - Alert lifecycle management (create, dismiss, clear)
+ * - Geographic calculations for zone violations
+ */
 class AlertService {
   constructor() {
+    // In-memory storage for alerts
     this.alerts = new Map(); // Store alerts by ID
-    this.flightAlerts = new Map(); // Track alerts per flight
+    this.flightAlerts = new Map(); // Track alerts per flight for deduplication
+    
+    // Initialize restricted zones for monitoring
     this.restrictedZones = this._initializeRestrictedZones();
   }
 
+  /**
+   * Initialize predefined restricted zones for monitoring
+   * These represent real-world restricted airspace areas in India
+   * @returns {Array<Object>} Array of restricted zone objects
+   */
   _initializeRestrictedZones() {
     return [
       {
@@ -40,14 +58,19 @@ class AlertService {
     ];
   }
 
-  // Check for lost communication alerts
+  /**
+   * Check for lost communication alerts
+   * Monitors flights with 'lost comm' status and creates/manages alerts accordingly
+   * @param {Array<Object>} flights - Array of flight objects to check
+   * @returns {Array<Object>} Array of new alerts created
+   */
   checkLostCommunication(flights) {
     const newAlerts = [];
     
     flights.forEach(flight => {
+      const alertKey = `lost-comm-${flight.id}`;
+      
       if (flight.status === 'lost comm') {
-        const alertKey = `lost-comm-${flight.id}`;
-        
         // Only create alert if we don't already have one for this flight
         if (!this.flightAlerts.has(alertKey)) {
           const alert = {
@@ -65,7 +88,6 @@ class AlertService {
         }
       } else {
         // If flight is no longer in lost comm status, remove the alert
-        const alertKey = `lost-comm-${flight.id}`;
         if (this.flightAlerts.has(alertKey)) {
           const alertId = this.flightAlerts.get(alertKey);
           this.alerts.delete(alertId);
@@ -77,21 +99,27 @@ class AlertService {
     return newAlerts;
   }
 
-  // Check for restricted zone entry alerts
+  /**
+   * Check for restricted zone entry/exit alerts
+   * Monitors flights entering or exiting restricted airspace zones
+   * @param {Array<Object>} flights - Array of flight objects to check
+   * @returns {Array<Object>} Array of new alerts created
+   */
   checkRestrictedZoneEntry(flights) {
     const newAlerts = [];
     
     flights.forEach(flight => {
       this.restrictedZones.forEach(zone => {
-        const distance = this._calculateDistance(
+        const alertKey = `restricted-zone-${flight.id}-${zone.id}`;
+        
+        // Calculate distance from flight to zone center
+        const distance = calculateDistance(
           [flight.latitude, flight.longitude],
           zone.center
         );
         
         if (distance <= zone.radius) {
-          const alertKey = `restricted-zone-${flight.id}-${zone.id}`;
-          
-          // Only create alert if we don't already have one for this flight in this zone
+          // Flight is inside the restricted zone
           if (!this.flightAlerts.has(alertKey)) {
             const alert = {
               id: uuidv4(),
@@ -99,7 +127,7 @@ class AlertService {
               type: 'restricted-zone',
               message: `Flight ${flight.flightNumber} has entered ${zone.name}`,
               timestamp: new Date(),
-              severity: zone.type === 'military' ? 'high' : zone.type === 'restricted' ? 'medium' : 'low',
+              severity: this._getZoneSeverity(zone.type),
               zoneId: zone.id,
               zoneName: zone.name,
               zoneType: zone.type
@@ -110,8 +138,7 @@ class AlertService {
             newAlerts.push(alert);
           }
         } else {
-          // If flight is no longer in the zone, remove the alert
-          const alertKey = `restricted-zone-${flight.id}-${zone.id}`;
+          // Flight is outside the zone - remove alert if it exists
           if (this.flightAlerts.has(alertKey)) {
             const alertId = this.flightAlerts.get(alertKey);
             this.alerts.delete(alertId);
@@ -124,27 +151,26 @@ class AlertService {
     return newAlerts;
   }
 
-  // Calculate distance between two points in meters
-  _calculateDistance(point1, point2) {
-    const R = 6371000; // Earth's radius in meters
-    const dLat = this._toRadians(point2[0] - point1[0]);
-    const dLon = this._toRadians(point2[1] - point1[1]);
-    const lat1 = this._toRadians(point1[0]);
-    const lat2 = this._toRadians(point2[0]);
-
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-
-    return distance;
+  /**
+   * Get severity level based on zone type
+   * @param {string} zoneType - Type of restricted zone
+   * @returns {string} Severity level ('high', 'medium', 'low')
+   */
+  _getZoneSeverity(zoneType) {
+    const severityMap = {
+      'military': 'high',
+      'restricted': 'medium',
+      'airport': 'low'
+    };
+    return severityMap[zoneType] || 'low';
   }
 
-  _toRadians(degrees) {
-    return degrees * (Math.PI / 180);
-  }
-
-  // Process all flights and generate alerts
+  /**
+   * Process all flights and generate alerts
+   * Main entry point for alert processing - checks all alert types
+   * @param {Array<Object>} flights - Array of flight objects to process
+   * @returns {Array<Object>} Combined array of all new alerts
+   */
   processFlights(flights) {
     const lostCommAlerts = this.checkLostCommunication(flights);
     const restrictedZoneAlerts = this.checkRestrictedZoneEntry(flights);
@@ -152,17 +178,29 @@ class AlertService {
     return [...lostCommAlerts, ...restrictedZoneAlerts];
   }
 
-  // Get all active alerts
+  /**
+   * Get all active alerts
+   * @returns {Array<Object>} Array of all current alerts
+   */
   getAllAlerts() {
     return Array.from(this.alerts.values());
   }
 
-  // Get alerts for a specific flight
+  /**
+   * Get alerts for a specific flight
+   * @param {string} flightId - ID of the flight
+   * @returns {Array<Object>} Array of alerts for the specified flight
+   */
   getFlightAlerts(flightId) {
     return Array.from(this.alerts.values()).filter(alert => alert.flightId === flightId);
   }
 
-  // Dismiss an alert
+  /**
+   * Dismiss an alert by ID
+   * Removes the alert from both storage maps
+   * @param {string} alertId - ID of the alert to dismiss
+   * @returns {boolean} True if alert was found and dismissed, false otherwise
+   */
   dismissAlert(alertId) {
     const alert = this.alerts.get(alertId);
     if (alert) {
@@ -177,12 +215,18 @@ class AlertService {
     return false;
   }
 
-  // Get restricted zones
+  /**
+   * Get all restricted zones
+   * @returns {Array<Object>} Array of restricted zone objects
+   */
   getRestrictedZones() {
     return this.restrictedZones;
   }
 
-  // Clear all alerts
+  /**
+   * Clear all alerts
+   * Removes all alerts from storage (useful for testing or reset)
+   */
   clearAllAlerts() {
     this.alerts.clear();
     this.flightAlerts.clear();

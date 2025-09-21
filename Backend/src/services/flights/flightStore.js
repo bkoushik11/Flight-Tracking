@@ -1,9 +1,22 @@
 const { randomUUID } = require("crypto");
 const { GEOGRAPHIC_BOUNDS } = require("../../utils/constants");
+const { calculateBearing, interpolatePoint } = require("../../utils/geoUtils");
 
+/**
+ * FlightStore - In-memory storage and management for flight data
+ * 
+ * This class handles:
+ * - Flight data storage and retrieval
+ * - Flight generation with realistic data
+ * - Flight position updates and history tracking
+ * - Geographic calculations for flight paths
+ */
 class FlightStore {
   constructor() {
+    // Core storage
     this.flights = new Map();
+    
+    // Configuration
     this.statuses = ["on-time", "delayed", "landed", "lost comm"];
     this.maxHistoryLength = 50;
     
@@ -30,42 +43,44 @@ class FlightStore {
     ];
   }
 
+  /**
+   * Generate a random number between min and max
+   * @param {number} min - Minimum value
+   * @param {number} max - Maximum value
+   * @returns {number} Random number in range
+   */
   _rand(min, max) {
     return Math.random() * (max - min) + min;
   }
 
-  _calculateHeading(lat1, lng1, lat2, lng2) {
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const lat1Rad = lat1 * Math.PI / 180;
-    const lat2Rad = lat2 * Math.PI / 180;
-    
-    const y = Math.sin(dLng) * Math.cos(lat2Rad);
-    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
-    
-    let heading = Math.atan2(y, x) * 180 / Math.PI;
-    return (heading + 360) % 360; // Normalize to 0-360
-  }
-
+  /**
+   * Generate a new flight with realistic data
+   * Creates a flight with random origin/destination, position, and flight parameters
+   * @returns {Object} New flight object
+   */
   _newFlight() {
-    // Select random origin and destination airports
+    // Select random origin and destination airports (ensure they're different)
     const originAirport = this.airports[Math.floor(Math.random() * this.airports.length)];
     let destinationAirport;
     do {
       destinationAirport = this.airports[Math.floor(Math.random() * this.airports.length)];
-    } while (destinationAirport.code === originAirport.code); // Ensure different origin/destination
+    } while (destinationAirport.code === originAirport.code);
 
-    // Generate flight number with airline codes
+    // Generate realistic flight number with Indian airline codes
     const airlines = ["AI", "6E", "SG", "G8", "IX", "UK"];
     const airline = airlines[Math.floor(Math.random() * airlines.length)];
     const flightNumber = `${airline}${Math.floor(100 + Math.random() * 900)}`;
 
     // Calculate initial position (somewhere between origin and destination)
     const progress = this._rand(0.1, 0.9); // 10% to 90% of the way
-    const lat = originAirport.lat + (destinationAirport.lat - originAirport.lat) * progress;
-    const lng = originAirport.lng + (destinationAirport.lng - originAirport.lng) * progress;
+    const [lat, lng] = interpolatePoint(
+      [originAirport.lat, originAirport.lng],
+      [destinationAirport.lat, destinationAirport.lng],
+      progress
+    );
 
-    // Calculate heading towards destination
-    const heading = this._calculateHeading(lat, lng, destinationAirport.lat, destinationAirport.lng);
+    // Calculate heading towards destination using utility function
+    const heading = calculateBearing([lat, lng], [destinationAirport.lat, destinationAirport.lng]);
 
     return {
       id: randomUUID().slice(0, 8),
@@ -86,6 +101,12 @@ class FlightStore {
     };
   }
 
+  /**
+   * Seed the store with a specified number of flights
+   * Clears existing flights and generates new ones
+   * @param {number} count - Number of flights to generate (default: 8)
+   * @returns {Array<Object>} Array of generated flights
+   */
   seedFlights(count = 8) {
     this.flights.clear();
     for (let i = 0; i < count; i++) {
@@ -95,18 +116,35 @@ class FlightStore {
     return this.getAllFlights();
   }
 
+  /**
+   * Get all flights from storage
+   * @returns {Array<Object>} Array of all flight objects
+   */
   getAllFlights() {
     return Array.from(this.flights.values());
   }
 
+  /**
+   * Get a specific flight by ID
+   * @param {string} id - Flight ID
+   * @returns {Object|null} Flight object or null if not found
+   */
   getFlight(id) {
     return this.flights.get(id);
   }
 
+  /**
+   * Update a flight with new data
+   * Automatically manages position history and timestamps
+   * @param {string} id - Flight ID
+   * @param {Object} updates - Object containing fields to update
+   * @returns {Object|null} Updated flight object or null if not found
+   */
   updateFlight(id, updates) {
     const flight = this.flights.get(id);
     if (!flight) return null;
 
+    // Apply updates
     Object.assign(flight, updates);
     flight.updatedAt = Date.now();
     
@@ -118,7 +156,7 @@ class FlightStore {
         ts: flight.updatedAt 
       });
       
-      // Trim history
+      // Trim history to maintain performance
       if (flight.history.length > this.maxHistoryLength) {
         flight.history.shift();
       }
@@ -127,11 +165,20 @@ class FlightStore {
     return flight;
   }
 
+  /**
+   * Reset the store to default state
+   * Clears all flights and seeds with default count
+   * @returns {Array<Object>} Array of newly generated flights
+   */
   reset() {
     this.flights.clear();
     return this.seedFlights();
   }
 
+  /**
+   * Get the current number of flights in storage
+   * @returns {number} Number of flights
+   */
   getCount() {
     return this.flights.size;
   }

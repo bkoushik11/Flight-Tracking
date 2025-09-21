@@ -108,8 +108,8 @@ export const useFlights = (options: UseFlightsOptions = {}) => {
         (async () => {
           try {
             const count = await flightService.getCount();
-            if (count < 40) {
-              await flightService.seed(40);
+            if (count < 80) {
+              await flightService.seed(80);
               await fetchFlights();
             }
           } catch {}
@@ -134,19 +134,24 @@ export const useFlights = (options: UseFlightsOptions = {}) => {
     return () => clearInterval(interval);
   }, [fetchFlights, fetchAlerts, refreshInterval, autoRefresh]);
 
-  // Socket.IO real-time updates with debounced state apply and reconnect backoff
+  // Socket.IO real-time updates with improved connection handling
   useEffect(() => {
     const baseUrl = (import.meta as any).env?.VITE_API_URL || '/api';
     const url = baseUrl.replace(/\/$/, '');
-    let attempt = 0;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+    
     const socket = io(url, {
       path: '/socket.io',
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: Infinity,
+      reconnectionAttempts: maxReconnectAttempts,
       reconnectionDelayMax: 10000,
-      reconnectionDelay: 500
+      reconnectionDelay: 1000,
+      timeout: 20000,
+      forceNew: true
     });
+    
     socketRef.current = socket;
 
     const applyBufferedUpdate = () => {
@@ -161,61 +166,89 @@ export const useFlights = (options: UseFlightsOptions = {}) => {
     };
 
     socket.on('connect', () => {
-      attempt = 0;
+      console.log('WebSocket connected');
+      reconnectAttempts = 0;
+      setError(null);
       socket.emit('request_flights');
     });
 
-    socket.on('reconnect_attempt', () => {
-      attempt++;
-      // Exponential backoff capping at 10s
-      const delay = Math.min(10000, 500 * Math.pow(2, attempt));
-      socket.io.opts.reconnectionDelay = delay;
+    socket.on('disconnect', (reason) => {
+      console.log('WebSocket disconnected:', reason);
+      if (reason === 'io server disconnect') {
+        // Server initiated disconnect, don't reconnect
+        setError('Server disconnected. Please refresh the page.');
+      }
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('WebSocket connection error:', error);
+      setError('Connection failed. Retrying...');
+    });
+
+    socket.on('reconnect_attempt', (attemptNumber) => {
+      reconnectAttempts = attemptNumber;
+      console.log(`Reconnection attempt ${attemptNumber}/${maxReconnectAttempts}`);
+      setError(`Reconnecting... (${attemptNumber}/${maxReconnectAttempts})`);
+    });
+
+    socket.on('reconnect_failed', () => {
+      console.error('WebSocket reconnection failed');
+      setError('Connection lost. Please refresh the page.');
     });
 
     let lastUpdateMs = 0;
     socket.on('flights', (raw: any[]) => {
-      // Map backend flight shape to frontend
-      const mapped: Flight[] = raw.map((f: any) => ({
-        id: String(f.id),
-        flightNumber: String(f.flightNumber || f.id || 'FL-000'),
-        latitude: Number(f.lat ?? f.latitude ?? 0),
-        longitude: Number(f.lng ?? f.longitude ?? 0),
-        altitude: Number(f.altitude ?? 0),
-        speed: Number(f.speed ?? 0),
-        heading: Number(f.heading ?? 0),
-        status: String(f.status || 'on-time').replace(' ', '-') as any,
-        aircraft: String(f.aircraft || 'Unknown'),
-        origin: String(f.origin || 'N/A'),
-        destination: String(f.destination || 'N/A'),
-        lastUpdate: new Date(f.updatedAt ?? Date.now()),
-        path: Array.isArray(f.history) ? f.history.map((h: any) => [Number(h.lat), Number(h.lng)] as [number, number]) : [],
-      }));
+      try {
+        // Map backend flight shape to frontend
+        const mapped: Flight[] = raw.map((f: any) => ({
+          id: String(f.id),
+          flightNumber: String(f.flightNumber || f.id || 'FL-000'),
+          latitude: Number(f.lat ?? f.latitude ?? 0),
+          longitude: Number(f.lng ?? f.longitude ?? 0),
+          altitude: Number(f.altitude ?? 0),
+          speed: Number(f.speed ?? 0),
+          heading: Number(f.heading ?? 0),
+          status: String(f.status || 'on-time').replace(' ', '-') as any,
+          aircraft: String(f.aircraft || 'Unknown'),
+          origin: String(f.origin || 'N/A'),
+          destination: String(f.destination || 'N/A'),
+          lastUpdate: new Date(f.updatedAt ?? Date.now()),
+          path: Array.isArray(f.history) ? f.history.map((h: any) => [Number(h.lat), Number(h.lng)] as [number, number]) : [],
+        }));
 
-      updateBufferRef.current = mapped;
-      // Throttle: apply at most ~3fps
-      const now = Date.now();
-      if (now - lastUpdateMs > 300) {
-        if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = window.setTimeout(() => {
-          lastUpdateMs = Date.now();
-          applyBufferedUpdate();
-        }, 100);
+        updateBufferRef.current = mapped;
+        
+        // Throttle updates to prevent excessive re-renders
+        const now = Date.now();
+        if (now - lastUpdateMs > 300) {
+          if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = window.setTimeout(() => {
+            lastUpdateMs = Date.now();
+            applyBufferedUpdate();
+          }, 100);
+        }
+      } catch (error) {
+        console.error('Error processing flight data:', error);
       }
     });
 
     // Handle real-time alerts
     socket.on('alerts', (newAlerts: any[]) => {
-      const mappedAlerts: Alert[] = newAlerts.map((alert: any) => ({
-        ...alert,
-        timestamp: new Date(alert.timestamp)
-      }));
-      
-      setAlerts(prev => {
-        // Add new alerts, avoiding duplicates
-        const existingIds = new Set(prev.map(a => a.id));
-        const uniqueNewAlerts = mappedAlerts.filter(a => !existingIds.has(a.id));
-        return [...uniqueNewAlerts, ...prev];
-      });
+      try {
+        const mappedAlerts: Alert[] = newAlerts.map((alert: any) => ({
+          ...alert,
+          timestamp: new Date(alert.timestamp)
+        }));
+        
+        setAlerts(prev => {
+          // Add new alerts, avoiding duplicates
+          const existingIds = new Set(prev.map(a => a.id));
+          const uniqueNewAlerts = mappedAlerts.filter(a => !existingIds.has(a.id));
+          return [...uniqueNewAlerts, ...prev];
+        });
+      } catch (error) {
+        console.error('Error processing alerts:', error);
+      }
     });
 
     return () => {
