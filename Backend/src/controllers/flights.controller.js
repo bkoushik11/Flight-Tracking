@@ -3,7 +3,7 @@ const flightService = require("../services/flights/flightService");
 class FlightsController {
   async getAllFlights(_req, res) {
     try {
-      const flights = flightService.getAllFlights();
+      const flights = await flightService.getAllFlights();
       res.json({ flights, total: flights.length });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch flights", message: error.message });
@@ -17,7 +17,7 @@ class FlightsController {
         return res.status(400).json({ error: "Validation Error", message: "id is required" });
       }
 
-      const flight = flightService.getFlight(id);
+      const flight = await flightService.getFlight(id);
       if (!flight) {
         return res.status(404).json({ error: "Flight not found", message: `No flight found with ID: ${id}` });
       }
@@ -30,7 +30,7 @@ class FlightsController {
 
   async resetFlights(_req, res) {
     try {
-      const flights = flightService.resetFlights();
+      const flights = await flightService.resetFlights();
       res.json({ message: "Flights reset successfully", count: flights.length, flights });
     } catch (error) {
       res.status(500).json({ error: "Failed to reset flights", message: error.message });
@@ -40,10 +40,10 @@ class FlightsController {
   async seedFlights(req, res) {
     try {
       const { count } = req.body;
-      const flights = flightService.seedFlights(count);
-      res.json({ message: "Flights seeded successfully", count: flights.length, flights });
+      const flights = await flightService.seedFlights(count);
+      res.json({ message: "Flights data fetched successfully", count: flights.length, flights });
     } catch (error) {
-      res.status(500).json({ error: "Failed to seed flights", message: error.message });
+      res.status(500).json({ error: "Failed to fetch flights", message: error.message });
     }
   }
 

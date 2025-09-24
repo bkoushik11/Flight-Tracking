@@ -1,19 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Flight, Alert, RestrictedZone } from '../types/flight';
+import { Flight } from '../types/flight';
 import { flightService } from '../services/flightService';
 import { io, Socket } from 'socket.io-client';
 
-interface UseFlightsOptions {
-  refreshInterval?: number;
-  autoRefresh?: boolean;
-}
-
-export const useFlights = (options: UseFlightsOptions = {}) => {
-  const { refreshInterval = 5000, autoRefresh = true } = options;
+export const useFlights = () => {
+  // Auto-refresh disabled to keep flights static
   
   const [flights, setFlights] = useState<Flight[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [restrictedZones, setRestrictedZones] = useState<RestrictedZone[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -51,94 +44,49 @@ export const useFlights = (options: UseFlightsOptions = {}) => {
     }
   }, []);
 
-  const fetchAlerts = useCallback(async () => {
-    try {
-      const alertsData = await flightService.getAlerts();
-      setAlerts(alertsData.map((alert: any) => ({
-        ...alert,
-        timestamp: new Date(alert.timestamp)
-      })));
-    } catch (err) {
-      console.error('Error fetching alerts:', err);
-    }
-  }, []);
+  
 
-  const fetchRestrictedZones = useCallback(async () => {
-    try {
-      const zones = await flightService.getRestrictedZones();
-      setRestrictedZones(zones);
-    } catch (err) {
-      console.error('Error fetching restricted zones:', err);
-    }
-  }, []);
 
-  const dismissAlert = useCallback(async (alertId: string) => {
-    try {
-      await flightService.dismissAlert(alertId);
-      setAlerts(prev => prev.filter(alert => alert.id !== alertId));
-    } catch (err) {
-      console.error('Error dismissing alert:', err);
-    }
-  }, []);
+
+  
 
   const refreshData = useCallback(async (filters?: {
     minAltitude?: number;
     maxAltitude?: number;
     statuses?: string[];
   }) => {
-    await Promise.all([
-      fetchFlights(filters),
-      fetchAlerts()
-    ]);
-  }, [fetchFlights, fetchAlerts]);
+    await fetchFlights(filters);
+  }, [fetchFlights]);
 
   // Initial data load
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
       try {
-        // Kick off initial fetches immediately for faster first paint
-        await Promise.all([
-          fetchFlights(),
-          fetchAlerts(),
-          fetchRestrictedZones()
-        ]);
-
-        // In background, ensure sufficient flights exist, then refresh once
-        (async () => {
-          try {
-            const count = await flightService.getCount();
-            if (count < 80) {
-              await flightService.seed(80);
-              await fetchFlights();
-            }
-          } catch {}
-        })();
+        await fetchFlights();
       } finally {
         setLoading(false);
       }
     };
 
     loadInitialData();
-  }, [fetchFlights, fetchAlerts, fetchRestrictedZones]);
+  }, [fetchFlights]);
 
-  // Auto-refresh flights
-  useEffect(() => {
-    if (!autoRefresh) return;
+  // Auto-refresh flights - DISABLED to keep existing flights static
+  // useEffect(() => {
+  //   if (!autoRefresh) return;
 
-    const interval = setInterval(() => {
-      fetchFlights();
-      fetchAlerts();
-    }, refreshInterval);
+  //   const interval = setInterval(() => {
+  //     fetchFlights();
+  //   }, refreshInterval);
 
-    return () => clearInterval(interval);
-  }, [fetchFlights, fetchAlerts, refreshInterval, autoRefresh]);
+  //   return () => clearInterval(interval);
+  // }, [fetchFlights, refreshInterval, autoRefresh]);
 
   // Socket.IO real-time updates with improved connection handling
   useEffect(() => {
     const baseUrl = (import.meta as any).env?.VITE_API_URL || '/api';
     const url = baseUrl.replace(/\/$/, '');
-    let reconnectAttempts = 0;
     const maxReconnectAttempts = 10;
     
     const socket = io(url, {
@@ -158,7 +106,7 @@ export const useFlights = (options: UseFlightsOptions = {}) => {
       if (!updateBufferRef.current) return;
       const flights = updateBufferRef.current;
       updateBufferRef.current = null;
-      setFlights(flights.map(f => ({
+      setFlights(flights.map((f: any) => ({
         ...f,
         lastUpdate: new Date((f as any).lastUpdate || Date.now())
       })));
@@ -166,33 +114,26 @@ export const useFlights = (options: UseFlightsOptions = {}) => {
     };
 
     socket.on('connect', () => {
-      console.log('WebSocket connected');
-      reconnectAttempts = 0;
       setError(null);
       socket.emit('request_flights');
     });
 
-    socket.on('disconnect', (reason) => {
-      console.log('WebSocket disconnected:', reason);
+    socket.on('disconnect', (reason: any) => {
       if (reason === 'io server disconnect') {
         // Server initiated disconnect, don't reconnect
         setError('Server disconnected. Please refresh the page.');
       }
     });
 
-    socket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error);
+    socket.on('connect_error', () => {
       setError('Connection failed. Retrying...');
     });
 
-    socket.on('reconnect_attempt', (attemptNumber) => {
-      reconnectAttempts = attemptNumber;
-      console.log(`Reconnection attempt ${attemptNumber}/${maxReconnectAttempts}`);
+    socket.on('reconnect_attempt', (attemptNumber: any) => {
       setError(`Reconnecting... (${attemptNumber}/${maxReconnectAttempts})`);
     });
 
     socket.on('reconnect_failed', () => {
-      console.error('WebSocket reconnection failed');
       setError('Connection lost. Please refresh the page.');
     });
 
@@ -228,28 +169,12 @@ export const useFlights = (options: UseFlightsOptions = {}) => {
           }, 100);
         }
       } catch (error) {
-        console.error('Error processing flight data:', error);
+        // Silent error handling for flight data processing
       }
     });
 
-    // Handle real-time alerts
-    socket.on('alerts', (newAlerts: any[]) => {
-      try {
-        const mappedAlerts: Alert[] = newAlerts.map((alert: any) => ({
-          ...alert,
-          timestamp: new Date(alert.timestamp)
-        }));
-        
-        setAlerts(prev => {
-          // Add new alerts, avoiding duplicates
-          const existingIds = new Set(prev.map(a => a.id));
-          const uniqueNewAlerts = mappedAlerts.filter(a => !existingIds.has(a.id));
-          return [...uniqueNewAlerts, ...prev];
-        });
-      } catch (error) {
-        console.error('Error processing alerts:', error);
-      }
-    });
+    // Handle real-time alerts - functionality removed and cleaned up
+    // socket.on('alerts', (newAlerts: any[]) => {
 
     return () => {
       if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
@@ -259,13 +184,10 @@ export const useFlights = (options: UseFlightsOptions = {}) => {
 
   return {
     flights,
-    alerts,
-    restrictedZones,
     loading,
     error,
     lastUpdate,
     refreshData,
-    dismissAlert,
     fetchFlights
   };
 };

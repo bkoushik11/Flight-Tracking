@@ -19,20 +19,3 @@ export type FlightStatus =
   | 'delayed' 
   | 'landed' 
   | 'lost-comm';
-
-export interface RestrictedZone {
-  id: string;
-  name: string;
-  center: [number, number];
-  radius: number; // meters
-  type: 'military' | 'airport' | 'restricted';
-}
-
-export interface Alert {
-  id: string;
-  flightId: string;
-  type: 'restricted-zone' | 'lost-comm';
-  message: string;
-  timestamp: Date;
-  severity: 'low' | 'medium' | 'high';
-}

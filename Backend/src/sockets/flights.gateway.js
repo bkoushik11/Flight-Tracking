@@ -22,7 +22,6 @@ class FlightsGateway {
     };
     
     this.connectedClients.set(socket.id, clientInfo);
-    console.log(`Client connected: ${socket.id} (Total: ${this.connectedClients.size})`);
 
     // Send current flights immediately on connect
     this.sendCurrentFlights(socket);
@@ -38,12 +37,11 @@ class FlightsGateway {
 
   handleDisconnection(socket) {
     this.connectedClients.delete(socket.id);
-    console.log(`Client disconnected: ${socket.id} (Total: ${this.connectedClients.size})`);
   }
 
-  handleFlightRequest(socket) {
+  async handleFlightRequest(socket) {
     this.updateClientActivity(socket.id);
-    this.sendCurrentFlights(socket);
+    await this.sendCurrentFlights(socket);
   }
 
   handleFlightCountRequest(socket) {
@@ -57,7 +55,7 @@ class FlightsGateway {
     }
   }
 
-  handleFlightSubscription(socket, { id }) {
+  async handleFlightSubscription(socket, { id }) {
     if (!id) {
       socket.emit("error", { message: "Flight ID is required" });
       return;
@@ -72,7 +70,7 @@ class FlightsGateway {
     }
 
     try {
-      const flight = flightService.getFlight(id);
+      const flight = await flightService.getFlight(id);
       if (flight) {
         socket.emit("flight", flight);
       } else {
@@ -108,12 +106,11 @@ class FlightsGateway {
     }
   }
 
-  sendCurrentFlights(socket) {
+  async sendCurrentFlights(socket) {
     try {
-      const flights = flightService.getAllFlights();
+      const flights = await flightService.getAllFlights();
       socket.emit("flights", flights);
     } catch (error) {
-      console.error("Error sending flights to client:", error);
       socket.emit("error", { 
         message: "Failed to fetch flights", 
         error: error.message 

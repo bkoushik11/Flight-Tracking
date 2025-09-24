@@ -2,7 +2,7 @@ require("dotenv").config();
 const http = require("http");
 const { Server } = require("socket.io");
 const app = require("./app");
-const simulator = require("./services/flights/simulator");
+const flightService = require("./services/flights/flightService");
 const FlightsGateway = require("./sockets/flights.gateway");
 
 const { CONFIG } = require("./utils/constants");
@@ -17,23 +17,35 @@ const io = new Server(server, {
 // Initialize socket gateway
 const flightsGateway = new FlightsGateway(io);
 
-// Connect simulator to socket gateway
-simulator.on("tick", (flights) => {
-  flightsGateway.broadcastFlightUpdate(flights);
-});
+// Set up periodic flight data fetching from OpenSky API
+let updateInterval;
 
-// Handle alert events
-simulator.on("alerts", (alerts) => {
-  flightsGateway.broadcastAlerts(alerts);
-});
+const fetchAndBroadcastFlights = async () => {
+  try {
+    const flights = await flightService.getAllFlights();
+    flightsGateway.broadcastFlightUpdate(flights);
+  } catch (error) {
+    console.error('Error fetching flights:', error);
+  }
+};
 
-// Start the simulator loop
-simulator.start(TICK_MS);
+// Start periodic updates for real-time data
+const startPeriodicUpdates = () => {
+  updateInterval = setInterval(fetchAndBroadcastFlights, TICK_MS);
+  console.log(`🔄 Started periodic flight updates every ${TICK_MS}ms`);
+};
+
+startPeriodicUpdates();
+
+// Initial fetch
+fetchAndBroadcastFlights();
 
 // Graceful shutdown
 process.on("SIGINT", () => {
   console.log("\nGracefully shutting down...");
-  simulator.stop();
+  if (updateInterval) {
+    clearInterval(updateInterval);
+  }
   server.close(() => {
     console.log("Server closed");
     process.exit(0);
@@ -42,7 +54,9 @@ process.on("SIGINT", () => {
 
 process.on("SIGTERM", () => {
   console.log("\nGracefully shutting down...");
-  simulator.stop();
+  if (updateInterval) {
+    clearInterval(updateInterval);
+  }
   server.close(() => {
     console.log("Server closed");
     process.exit(0);
@@ -52,5 +66,5 @@ process.on("SIGTERM", () => {
 server.listen(PORT, () => {
   console.log(`🚀 Flight Tracker Backend running on http://localhost:${PORT}`);
   console.log(`📡 WebSocket server ready for real-time updates`);
-  console.log(`⏱️  Flight updates every ${TICK_MS}ms`);
+  console.log(`✈️  OpenSky API integration enabled with ${TICK_MS}ms refresh interval`);
 });

@@ -1,13 +1,11 @@
-import { useState, useCallback, useMemo } from 'react';
+import  { useState, useCallback, useMemo } from 'react';
 import { FlightMap } from './components/FlightMap';
 import { FilterPanel } from './components/FilterPanel';
-import { AlertsPanel } from './components/AlertsPanel';
 import { StatusBar } from './components/StatusBar';
-import { FlightDetails } from './components/FlightDetails';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useFlights } from './hooks/useFlights';
-import { Flight, Alert } from './types/flight';
+import { Flight } from './types/flight';
 import { MapPin } from 'lucide-react';
 
 // Constants for better maintainability
@@ -20,52 +18,25 @@ const DEFAULT_FILTERS = {
 function App() {
   const {
     flights,
-    alerts,
-    restrictedZones,
     loading,
     error,
     lastUpdate,
     refreshData,
-    dismissAlert,
     fetchFlights
   } = useFlights();
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
-  const [showAlerts, setShowAlerts] = useState(false);
-  const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
-  const [localAlerts, setLocalAlerts] = useState<Alert[]>([]);
+
 
   // Memoized filtered flights for better performance
   const filteredFlights = useMemo(() => {
-    return flights.filter(flight => {
+    return flights.filter((flight: Flight) => {
       const altitudeInRange = flight.altitude >= filters.minAltitude && flight.altitude <= filters.maxAltitude;
       const statusMatches = filters.statuses.length === 0 || filters.statuses.includes(flight.status);
       return altitudeInRange && statusMatches;
     });
   }, [flights, filters]);
-
-  // Memoized combined alerts
-  const allAlerts = useMemo(() => [...alerts, ...localAlerts], [alerts, localAlerts]);
-
-  const handleAlertGenerated = useCallback((alert: Alert) => {
-    setLocalAlerts(prev => {
-      // Avoid duplicate alerts
-      if (prev.some(a => a.flightId === alert.flightId && a.type === alert.type)) {
-        return prev;
-      }
-      return [...prev, alert];
-    });
-  }, []);
-
-  const handleDismissAlert = useCallback(async (alertId: string) => {
-    try {
-      await dismissAlert(alertId);
-      setLocalAlerts(prev => prev.filter(alert => alert.id !== alertId));
-    } catch (error) {
-      console.error('Failed to dismiss alert:', error);
-    }
-  }, [dismissAlert]);
 
   const handleFiltersChange = useCallback((newFilters: typeof DEFAULT_FILTERS) => {
     setFilters(newFilters);
@@ -80,12 +51,8 @@ function App() {
     setShowFilters(prev => !prev);
   }, []);
 
-  const toggleAlerts = useCallback(() => {
-    setShowAlerts(prev => !prev);
-  }, []);
-
-  const closeFlightDetails = useCallback(() => {
-    setSelectedFlight(null);
+  const handleFlightClick = useCallback((flight: Flight) => {
+    console.log('Flight clicked:', flight.flightNumber);
   }, []);
 
   if (loading) {
@@ -115,12 +82,6 @@ function App() {
                 isOpen={showFilters}
                 onToggle={toggleFilters}
               />
-              <AlertsPanel
-                alerts={allAlerts}
-                onDismissAlert={handleDismissAlert}
-                isOpen={showAlerts}
-                onToggle={toggleAlerts}
-              />
             </div>
           </div>
         </header>
@@ -129,9 +90,7 @@ function App() {
         <main className="flex-1">
           <FlightMap
             flights={filteredFlights}
-            restrictedZones={restrictedZones}
-            onAlertGenerated={handleAlertGenerated}
-            onFlightClick={setSelectedFlight}
+            onFlightClick={handleFlightClick}
           />
         </main>
 
@@ -143,12 +102,6 @@ function App() {
           lastUpdate={lastUpdate}
           error={error}
           onRefresh={handleRefresh}
-        />
-
-        {/* Flight Details Modal */}
-        <FlightDetails
-          flight={selectedFlight}
-          onClose={closeFlightDetails}
         />
       </div>
     </ErrorBoundary>

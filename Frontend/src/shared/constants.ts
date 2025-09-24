@@ -29,45 +29,6 @@ export const STATUS_BG_COLORS = {
   [FLIGHT_STATUSES.LOST_COMM]: 'bg-red-100 text-red-600'
 } as const;
 
-// Alert severity levels
-export const ALERT_SEVERITY = {
-  LOW: 'low',
-  MEDIUM: 'medium',
-  HIGH: 'high'
-} as const;
-
-export type AlertSeverity = typeof ALERT_SEVERITY[keyof typeof ALERT_SEVERITY];
-
-// Alert severity colors
-export const SEVERITY_COLORS = {
-  [ALERT_SEVERITY.LOW]: 'bg-blue-500',
-  [ALERT_SEVERITY.MEDIUM]: 'bg-yellow-500',
-  [ALERT_SEVERITY.HIGH]: 'bg-red-500'
-} as const;
-
-// Alert severity background colors
-export const SEVERITY_BG_COLORS = {
-  [ALERT_SEVERITY.LOW]: 'bg-blue-50 border-blue-200',
-  [ALERT_SEVERITY.MEDIUM]: 'bg-yellow-50 border-yellow-200',
-  [ALERT_SEVERITY.HIGH]: 'bg-red-50 border-red-200'
-} as const;
-
-// Restricted zone types
-export const ZONE_TYPES = {
-  MILITARY: 'military',
-  AIRPORT: 'airport',
-  RESTRICTED: 'restricted'
-} as const;
-
-export type ZoneType = typeof ZONE_TYPES[keyof typeof ZONE_TYPES];
-
-// Zone type colors
-export const ZONE_COLORS = {
-  [ZONE_TYPES.MILITARY]: '#dc2626',    // Red
-  [ZONE_TYPES.AIRPORT]: '#f59e0b',     // Yellow
-  [ZONE_TYPES.RESTRICTED]: '#ef4444'   // Red
-} as const;
-
 // Application configuration
 export const APP_CONFIG = {
   DEFAULT_FLIGHT_COUNT: 80,
@@ -105,33 +66,6 @@ export function getStatusColor(status: FlightStatus): string {
  */
 export function getStatusBgColor(status: FlightStatus): string {
   return STATUS_BG_COLORS[status] || STATUS_BG_COLORS[FLIGHT_STATUSES.ON_TIME];
-}
-
-/**
- * Get alert severity color
- * @param severity - Alert severity level
- * @returns Hex color code
- */
-export function getSeverityColor(severity: AlertSeverity): string {
-  return SEVERITY_COLORS[severity] || SEVERITY_COLORS[ALERT_SEVERITY.LOW];
-}
-
-/**
- * Get alert severity background color classes
- * @param severity - Alert severity level
- * @returns Tailwind CSS classes
- */
-export function getSeverityBgColor(severity: AlertSeverity): string {
-  return SEVERITY_BG_COLORS[severity] || SEVERITY_BG_COLORS[ALERT_SEVERITY.LOW];
-}
-
-/**
- * Get zone type color
- * @param zoneType - Zone type
- * @returns Hex color code
- */
-export function getZoneColor(zoneType: ZoneType): string {
-  return ZONE_COLORS[zoneType] || '#6b7280';
 }
 
 /**

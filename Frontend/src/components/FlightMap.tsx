@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useRef, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, LayersControl } from 'react-leaflet';
+
+import React, { useCallback, useMemo, useRef, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, LayersControl } from 'react-leaflet';
 import { Icon, LatLngExpression } from 'leaflet';
-import { Flight, RestrictedZone, Alert } from '../types/flight';
-import { getStatusColor, getZoneColor, UI_CONFIG } from '../shared/constants';
+import { Flight } from '../types/flight';
+import { getStatusColor, UI_CONFIG } from '../shared/constants';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default markers in React Leaflet
@@ -18,27 +19,21 @@ Icon.Default.mergeOptions({
  */
 interface FlightMapProps {
   flights: Flight[];
-  restrictedZones: RestrictedZone[];
-  onAlertGenerated?: (alert: Alert) => void;
   onFlightClick?: (flight: Flight) => void;
   center?: [number, number];
 }
 
 /**
  * Memoized icon cache for flight markers
- * Caches icons by status and heading bucket to improve performance
  */
 const iconCache = new Map<string, Icon>();
 
 /**
  * Create or retrieve a cached flight icon
- * Uses 15-degree heading buckets for efficient caching
- * @param flight - Flight object containing status and heading
- * @returns Leaflet Icon object
  */
 const createFlightIcon = (flight: Flight): Icon => {
   const color = getStatusColor(flight.status);
-  const rotationBucket = Math.round(flight.heading / 15) * 15; // 15-degree buckets for better caching
+  const rotationBucket = Math.round(flight.heading / 15) * 15;
   const key = `${flight.status}:${rotationBucket}`;
   
   const cached = iconCache.get(key);
@@ -60,8 +55,7 @@ const createFlightIcon = (flight: Flight): Icon => {
 };
 
 /**
- * Memoized flight marker component to reduce re-renders
- * Renders individual flight markers with popups and flight paths
+ * Flight marker component
  */
 const FlightMarker = React.memo<{
   flight: Flight;
@@ -112,12 +106,6 @@ const FlightMarker = React.memo<{
                 <p>Heading: {flight.heading}°</p>
               </div>
             </div>
-            <button
-              onClick={handleClick}
-              className="mt-2 w-full bg-blue-600 text-white py-1 px-3 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
-            >
-              View Details
-            </button>
           </div>
         </Popup>
       </Marker>
@@ -137,80 +125,25 @@ FlightMarker.displayName = 'FlightMarker';
 
 /**
  * Main FlightMap component
- * Renders an interactive map with flight markers, restricted zones, and real-time updates
- * 
- * Features:
- * - Real-time flight tracking with status-based colors
- * - Restricted zone visualization
- * - Interactive flight popups with detailed information
- * - Flight path trails
- * - Automatic alert generation for zone violations
  */
 export const FlightMap: React.FC<FlightMapProps> = ({ 
   flights,
-  restrictedZones, 
-  onAlertGenerated,
   onFlightClick,
   center
 }) => {
   const initialCenterRef = useRef<[number, number]>(center || UI_CONFIG.MAP_DEFAULT_CENTER);
-  
-  // Memoized distance calculation
-  const calculateDistance = useCallback((pos1: [number, number], pos2: [number, number]): number => {
-    const [lat1, lon1] = pos1;
-    const [lat2, lon2] = pos2;
-    const R = 6371000; // Earth's radius in meters
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  }, []);
-
-  // Check for restricted zone violations with throttling
-  useEffect(() => {
-    if (!onAlertGenerated) return;
-    
-    const checkViolations = () => {
-      flights.forEach(flight => {
-        restrictedZones.forEach(zone => {
-          const distance = calculateDistance(
-            [flight.latitude, flight.longitude],
-            zone.center
-          );
-          
-          if (distance <= zone.radius) {
-            onAlertGenerated({
-              id: `${flight.id}-${zone.id}-${Date.now()}`,
-              flightId: flight.id,
-              type: 'restricted-zone',
-              message: `Flight ${flight.flightNumber} has entered restricted zone ${zone.name}`,
-              timestamp: new Date(),
-              severity: 'high'
-            });
-          }
-        });
-      });
-    };
-
-    // Throttle violation checks to prevent excessive alerts
-    const timeoutId = setTimeout(checkViolations, 1000);
-    return () => clearTimeout(timeoutId);
-  }, [flights, restrictedZones, onAlertGenerated, calculateDistance]);
 
   const VisibleFlights = () => {
     const map = useMap();
     const bounds = map.getBounds();
     const visible = useMemo(() => 
-      flights.filter(f => bounds.contains([f.latitude, f.longitude])), 
+      flights.filter((f: Flight) => bounds.contains([f.latitude, f.longitude])), 
       [flights, bounds]
     );
     
     return (
       <>
-        {visible.map(flight => (
+        {visible.map((flight: Flight) => (
           <FlightMarker
             key={flight.id}
             flight={flight}
@@ -256,28 +189,6 @@ export const FlightMap: React.FC<FlightMapProps> = ({
       
       <StartupFocus target={UI_CONFIG.MAP_DEFAULT_CENTER} zoom={UI_CONFIG.MAP_FOCUS_ZOOM} />
       
-      {/* Restricted Zones */}
-      {restrictedZones.map(zone => (
-        <Circle
-          key={zone.id}
-          center={zone.center}
-          radius={zone.radius}
-          color={getZoneColor(zone.type)}
-          fillColor={getZoneColor(zone.type)}
-          fillOpacity={0.1}
-          weight={2}
-          dashArray="5, 5"
-        >
-          <Popup>
-            <div className="p-2">
-              <h3 className="font-bold text-red-600">{zone.name}</h3>
-              <p className="text-sm">Type: {zone.type}</p>
-              <p className="text-sm">Radius: {(zone.radius / 1000).toFixed(1)}km</p>
-            </div>
-          </Popup>
-        </Circle>
-      ))}
-
       <VisibleFlights />
     </MapContainer>
   );
@@ -285,8 +196,6 @@ export const FlightMap: React.FC<FlightMapProps> = ({
 
 /**
  * StartupFocus component
- * Animates the map to focus on a specific location when the component mounts
- * Only runs once to avoid unnecessary animations
  */
 const StartupFocus: React.FC<{ target: [number, number]; zoom: number }> = ({ target, zoom }) => {
   const map = useMap();
