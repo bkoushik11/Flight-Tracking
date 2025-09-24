@@ -85,12 +85,14 @@ export const useFlights = () => {
 
   // Socket.IO real-time updates with improved connection handling
   useEffect(() => {
-    const baseUrl = (import.meta as any).env?.VITE_API_URL || '/api';
-    const url = baseUrl.replace(/\/$/, '');
+    const baseUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
+    // Remove /api from the end for socket connection
+    const socketUrl = baseUrl.replace('/api', '');
     const maxReconnectAttempts = 10;
     
-    const socket = io(url, {
-      path: '/socket.io',
+    console.log('🔌 Connecting to backend socket at:', socketUrl);
+    
+    const socket = io(socketUrl, {
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: maxReconnectAttempts,
@@ -114,32 +116,39 @@ export const useFlights = () => {
     };
 
     socket.on('connect', () => {
+      console.log('✅ Socket connected to backend!');
       setError(null);
       socket.emit('request_flights');
     });
 
     socket.on('disconnect', (reason: any) => {
+      console.log('❌ Socket disconnected:', reason);
       if (reason === 'io server disconnect') {
         // Server initiated disconnect, don't reconnect
         setError('Server disconnected. Please refresh the page.');
       }
     });
 
-    socket.on('connect_error', () => {
+    socket.on('connect_error', (error: any) => {
+      console.log('🔴 Socket connection error:', error);
       setError('Connection failed. Retrying...');
     });
 
     socket.on('reconnect_attempt', (attemptNumber: any) => {
+      console.log(`🔄 Reconnect attempt ${attemptNumber}/${maxReconnectAttempts}`);
       setError(`Reconnecting... (${attemptNumber}/${maxReconnectAttempts})`);
     });
 
     socket.on('reconnect_failed', () => {
+      console.log('💥 Reconnection failed');
       setError('Connection lost. Please refresh the page.');
     });
 
     let lastUpdateMs = 0;
     socket.on('flights', (raw: any[]) => {
       try {
+        console.log('✈️ Received flights from backend:', raw.length, 'flights');
+        
         // Map backend flight shape to frontend
         const mapped: Flight[] = raw.map((f: any) => ({
           id: String(f.id),
@@ -156,6 +165,17 @@ export const useFlights = () => {
           lastUpdate: new Date(f.updatedAt ?? Date.now()),
           path: Array.isArray(f.history) ? f.history.map((h: any) => [Number(h.lat), Number(h.lng)] as [number, number]) : [],
         }));
+
+        console.log('✅ Mapped flights:', mapped.length, 'valid flights');
+        if (mapped.length > 0) {
+          console.log('First flight sample:', {
+            id: mapped[0].id,
+            flightNumber: mapped[0].flightNumber,
+            lat: mapped[0].latitude,
+            lng: mapped[0].longitude,
+            altitude: mapped[0].altitude
+          });
+        }
 
         updateBufferRef.current = mapped;
         

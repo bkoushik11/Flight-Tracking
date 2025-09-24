@@ -32,25 +32,26 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   onRefresh
 }) => {
   return (
-    <div className="bg-slate-800 text-white px-4 py-2 flex items-center justify-between text-sm">
+    <div className="midnight-panel px-4 py-2 flex items-center justify-between text-sm midnight-glow"
+         style={{ borderTop: '1px solid rgba(0, 217, 255, 0.3)' }}>
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2">
           {!error ? (
             <>
-              <Wifi size={16} className="text-green-400" />
-              <span>API Connected</span>
+              <Wifi size={16} className="midnight-text-accent" />
+              <span className="midnight-text-primary">API Connected</span>
             </>
           ) : (
             <>
-              <WifiOff size={16} className="text-red-400" />
-              <span>API Error</span>
+              <WifiOff size={16} className="midnight-text-critical" />
+              <span className="midnight-text-critical">API Error</span>
             </>
           )}
         </div>
         
         <div className="flex items-center space-x-2">
-          <Plane size={16} />
-          <span>
+          <Plane size={16} className="midnight-text-accent" />
+          <span className="midnight-text-primary">
             Showing {filteredFlights} of {totalFlights} flights
           </span>
         </div>
@@ -58,7 +59,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         {onRefresh && (
           <button
             onClick={onRefresh}
-            className="flex items-center space-x-1 bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded transition-colors"
+            className="flex items-center space-x-1 midnight-button px-2 py-1 rounded transition-colors"
           >
             <RefreshCw size={14} />
             <span>Refresh</span>
@@ -68,11 +69,11 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       
       <div className="flex items-center space-x-4">
         {error && (
-          <span className="text-red-400 text-xs">
+          <span className="midnight-text-critical text-xs">
             {error}
           </span>
         )}
-        <div className="text-xs text-gray-400">
+        <div className="text-xs midnight-text-secondary">
           Last updated: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'Never'}
         </div>
       </div>

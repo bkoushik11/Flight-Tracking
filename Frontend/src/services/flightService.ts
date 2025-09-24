@@ -27,14 +27,18 @@ export class FlightService {
     // Check cache first
     const now = Date.now();
     if (now - lastFetchTime < CACHE_DURATION && flightCache.length > 0) {
-      const filtered = this.applyFilters(flightCache, params);
+      const filtered = this.applyFilters(flightCache);
       return this.paginateResults(filtered, page, limit);
     }
 
     try {
+      console.log('📡 Fetching flights from backend API...');
       // Backend may return array or object { flights, total, page, limit }
       const raw = await httpGet<any>(`/flights`);
+      console.log('📨 Raw API response:', raw);
+      
       const rawFlights: any[] = Array.isArray(raw) ? raw : (raw?.flights ?? []);
+      console.log('🛫 Raw flights count:', rawFlights.length);
 
       // Map backend -> frontend flight shape
       const flights: Flight[] = rawFlights.map((f) => {
@@ -59,35 +63,38 @@ export class FlightService {
         };
       });
 
+      console.log('✅ Processed flights:', flights.length);
+      if (flights.length > 0) {
+        console.log('Sample flight:', {
+          id: flights[0].id,
+          flightNumber: flights[0].flightNumber,
+          lat: flights[0].latitude,
+          lng: flights[0].longitude,
+          heading: flights[0].heading
+        });
+      }
+
       // Update cache
       flightCache = flights;
       lastFetchTime = now;
 
       // Apply filters and pagination
-      const filtered = this.applyFilters(flights, params);
+      const filtered = this.applyFilters(flights);
       return this.paginateResults(filtered, page, limit);
     } catch (error) {
       console.error('Error fetching flights:', error);
       // Return cached data if available
       if (flightCache.length > 0) {
-        const filtered = this.applyFilters(flightCache, params);
+        const filtered = this.applyFilters(flightCache);
         return this.paginateResults(filtered, page, limit);
       }
       return { flights: [], total: 0, page, limit };
     }
   }
 
-  private applyFilters(flights: Flight[], params?: {
-    minAltitude?: number;
-    maxAltitude?: number;
-    statuses?: string[];
-  }): Flight[] {
-    return flights.filter((f) => {
-      const minOk = params?.minAltitude !== undefined ? f.altitude >= params.minAltitude : true;
-      const maxOk = params?.maxAltitude !== undefined ? f.altitude <= params.maxAltitude : true;
-      const statusOk = params?.statuses && params.statuses.length > 0 ? params.statuses.includes(f.status) : true;
-      return minOk && maxOk && statusOk;
-    });
+  private applyFilters(flights: Flight[]): Flight[] {
+    // Return all flights without any filtering
+    return flights;
   }
 
   private paginateResults(flights: Flight[], page: number, limit: number): FlightApiResponse {

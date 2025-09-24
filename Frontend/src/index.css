@@ -1,3 +1,130 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  color: #E8EDF4;
+  background-color: #0A0E1A;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+
+  /* Midnight Command Color Variables */
+  --primary-bg: #0A0E1A;
+  --secondary-bg: #141B2D;
+  --accent-primary: #00D9FF;
+  --accent-warning: #FFB800;
+  --accent-critical: #FF3B5C;
+  --ui-elements: #2D3B54;
+  --text-primary: #E8EDF4;
+  --text-secondary: #8B9AAF;
+}
+
+/* Critical body and root styles for map display */
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  background-color: #0A0E1A;
+}
+
+#root {
+  height: 100% !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Leaflet map container critical styles */
+.leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  position: relative !important;
+  z-index: 1 !important;
+  background-color: #0A0E1A !important;
+}
+
+/* Midnight Command Color Palette CSS Classes */
+.midnight-panel {
+  background: linear-gradient(135deg, #141B2D 0%, #0A0E1A 100%);
+  border: 1px solid rgba(0, 217, 255, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.midnight-glass {
+  background: rgba(20, 27, 45, 0.85);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(0, 217, 255, 0.2);
+}
+
+.midnight-glow {
+  box-shadow: 
+    0 0 20px rgba(0, 217, 255, 0.3),
+    0 0 40px rgba(0, 217, 255, 0.1),
+    inset 0 0 20px rgba(0, 217, 255, 0.05);
+}
+
+.midnight-radar-glow {
+  box-shadow: 
+    0 0 30px rgba(0, 217, 255, 0.4),
+    0 0 60px rgba(0, 217, 255, 0.2);
+  animation: midnight-radar-glow 2s ease-in-out infinite;
+}
+
+@keyframes midnight-radar-glow {
+  0%, 100% {
+    box-shadow: 
+      0 0 30px rgba(0, 217, 255, 0.4),
+      0 0 60px rgba(0, 217, 255, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 0 40px rgba(0, 217, 255, 0.6),
+      0 0 80px rgba(0, 217, 255, 0.3);
+  }
+}
+
+.midnight-button {
+  background: linear-gradient(135deg, #2D3B54 0%, #141B2D 100%);
+  border: 1px solid rgba(0, 217, 255, 0.5);
+  color: #E8EDF4;
+  transition: all 0.3s ease;
+}
+
+.midnight-button:hover {
+  background: linear-gradient(135deg, #00D9FF 0%, #2D3B54 100%);
+  box-shadow: 0 0 20px rgba(0, 217, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.midnight-text-primary {
+  color: #E8EDF4;
+}
+
+.midnight-text-secondary {
+  color: #8B9AAF;
+}
+
+.midnight-text-accent {
+  color: #00D9FF;
+}
+
+.midnight-text-warning {
+  color: #FFB800;
+}
+
+.midnight-text-critical {
+  color: #FF3B5C;
+}
