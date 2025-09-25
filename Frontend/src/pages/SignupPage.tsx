@@ -153,20 +153,19 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onBack, onLogin, onSucce
       <div className="relative z-10 flex items-center justify-center min-h-screen p-6">
         <div className="w-full max-w-md mx-auto">
           {/* Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-3 mb-6 px-6 py-3 rounded-2xl bg-slate-900/60 border border-cyan-400/30 backdrop-blur-md">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-3 mb-4 px-6 py-3 rounded-2xl bg-slate-900/60 border border-cyan-400/30 backdrop-blur-md">
               <Plane className="w-8 h-8 text-cyan-400" />
               <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-green-400 bg-clip-text text-transparent">
                 Flight Tracker
               </h1>
             </div>
-            <h2 className="text-3xl font-bold text-white mb-2">Create Account</h2>
-            <p className="text-slate-400">Join the aviation community</p>
+            <h2 className="text-2xl font-bold text-white mb-1">Create Account</h2>
           </div>
 
           {/* Signup Form */}
-          <div className="bg-slate-900/40 backdrop-blur-xl border border-cyan-400/20 rounded-2xl p-8">
-            <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="bg-slate-900/40 backdrop-blur-xl border border-cyan-400/20 rounded-2xl p-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {/* Full Name */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -294,7 +293,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onBack, onLogin, onSucce
           </div>
 
           {/* Footer */}
-          <div className="text-center mt-8">
+          <div className="text-center mt-6">
             <p className="text-xs text-slate-500">
               By creating an account, you agree to our Terms of Service and Privacy Policy
             </p>
