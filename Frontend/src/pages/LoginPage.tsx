@@ -110,8 +110,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSignup, onLoginS
         />
       </div>
 
-      {/* Back Button */}
+      {/* Logo in top left */}
       <div className="absolute top-6 left-6 z-30">
+        <img 
+          src="/WhatsApp Image 2025-09-25 at 12.25.57_dfd8943f.jpg" 
+          alt="Flight Tracker Logo" 
+          className="h-12 w-auto rounded-lg shadow-lg"
+        />
+      </div>
+
+      {/* Back Button */}
+      <div className="absolute top-6 right-6 z-30">
         <button
           onClick={onBack}
           className="group p-3 rounded-xl transition-all duration-300 bg-slate-900/80 hover:bg-slate-800/90 border border-cyan-400/30 hover:border-cyan-400/60 backdrop-blur-md shadow-lg hover:shadow-cyan-400/20"
