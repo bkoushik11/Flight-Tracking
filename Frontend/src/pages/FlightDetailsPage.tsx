@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Flight, FlightStatus } from '../types/flight';
-import { ArrowLeft, Compass, Activity, MapPin, Clock, Navigation, Gauge } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Flight } from '../types/flight';
+import { ArrowLeft, Activity, MapPin, Clock, Navigation, Gauge, History, Compass as CompassIcon } from 'lucide-react';
 import RadarDisplay from '../components/RadarDisplay';
 import CoordinatePanel from '../components/CoordinatePanel';
 import ControlButtons from '../components/ControlButtons';
+import Compass from '../components/Compass';
+import { flightService } from '../services/flightService';
 
 interface FlightDetailsPageProps {
   flight: Flight;
@@ -35,16 +37,26 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
   const [radarRotation, setRadarRotation] = useState(0);
   const [systemStatus, setSystemStatus] = useState<'ONLINE' | 'OFFLINE' | 'MAINTENANCE'>('ONLINE');
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [showFullHistory, setShowFullHistory] = useState(false);
+  const [flightHistory, setFlightHistory] = useState<CoordinateHistory[]>([]);
+  const [realFlightData, setRealFlightData] = useState<Flight | null>(null);
+  
+  // Radar animation states
+  const [sweepAngle, setSweepAngle] = useState(0);
+  const radarSweepRef = useRef<number | null>(null);
   
   // Live flight metrics with real-time simulation
-  const [liveMetrics, setLiveMetrics] = useState<LiveMetrics>({
-    latitude: flight.latitude || 34.0522,
-    longitude: flight.longitude || -118.2437,
-    altitude: flight.altitude || 19815,
-    speed: flight.speed || 450,
-    heading: flight.heading || 275,
-    verticalSpeed: 0,
-    groundSpeed: flight.speed || 450
+  const [liveMetrics, setLiveMetrics] = useState<LiveMetrics>(() => {
+    const currentFlight = realFlightData || flight;
+    return {
+      latitude: currentFlight.latitude || 34.0522,
+      longitude: currentFlight.longitude || -118.2437,
+      altitude: currentFlight.altitude || 19815,
+      speed: currentFlight.speed || 450,
+      heading: currentFlight.heading || 275,
+      verticalSpeed: 0,
+      groundSpeed: currentFlight.speed || 450
+    };
   });
   
   // Coordinate history for tracking
@@ -66,6 +78,84 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
       heading: 272
     }
   ]);
+
+  // Fetch real flight data from OpenSky API
+  useEffect(() => {
+    const fetchRealFlightData = async () => {
+      try {
+        const realData = await flightService.getFlightById(flight.id);
+        if (realData) {
+          setRealFlightData(realData);
+          setLiveMetrics({
+            latitude: realData.latitude || flight.latitude || 34.0522,
+            longitude: realData.longitude || flight.longitude || -118.2437,
+            altitude: realData.altitude || flight.altitude || 19815,
+            speed: realData.speed || flight.speed || 450,
+            heading: realData.heading || flight.heading || 275,
+            verticalSpeed: 0,
+            groundSpeed: realData.speed || flight.speed || 450
+          });
+          
+          // Generate history positions (simulate past 50 positions)
+          const history: CoordinateHistory[] = [];
+          for (let i = 50; i > 0; i--) {
+            const timeOffset = i * 2 * 60 * 1000; // 2 minutes apart
+            const latOffset = (Math.random() - 0.5) * 0.01 * i * 0.1;
+            const lngOffset = (Math.random() - 0.5) * 0.01 * i * 0.1;
+            history.push({
+              lat: (realData.latitude || 34.0522) + latOffset,
+              lng: (realData.longitude || -118.2437) + lngOffset,
+              altitude: Math.max(10000, (realData.altitude || 19815) + (Math.random() - 0.5) * 2000),
+              timestamp: Date.now() - timeOffset,
+              speed: Math.max(200, (realData.speed || 450) + (Math.random() - 0.5) * 50),
+              heading: ((realData.heading || 275) + (Math.random() - 0.5) * 20) % 360
+            });
+          }
+          setFlightHistory(history);
+        }
+      } catch (error) {
+        console.error('Error fetching real flight data:', error);
+      }
+    };
+
+    fetchRealFlightData();
+  }, [flight.id, flight.latitude, flight.longitude, flight.altitude, flight.speed, flight.heading]);
+
+  // Smooth radar sweep animation - runs continuously with smooth 360 rotation
+  useEffect(() => {
+    let previousTimestamp: number | null = null;
+    
+    const animateRadarSweep = (timestamp: number) => {
+      if (previousTimestamp === null) {
+        previousTimestamp = timestamp;
+      }
+      
+      // Calculate delta time for consistent speed regardless of frame rate
+      const deltaTime = timestamp - previousTimestamp;
+      previousTimestamp = timestamp;
+      
+      // Adjust speed based on frame rate (targeting 60fps)
+      const speedFactor = deltaTime / (1000 / 60);
+      const increment = 2 * speedFactor;
+      
+      setSweepAngle(prev => {
+        const newAngle = prev + increment;
+        // Instead of using modulo which causes jumps, we let it accumulate
+        // and only reset when it's significantly large to avoid precision issues
+        return newAngle > 100000 ? newAngle - 100000 : newAngle;
+      });
+      
+      radarSweepRef.current = requestAnimationFrame(animateRadarSweep);
+    };
+    
+    radarSweepRef.current = requestAnimationFrame(animateRadarSweep);
+    
+    return () => {
+      if (radarSweepRef.current) {
+        cancelAnimationFrame(radarSweepRef.current);
+      }
+    };
+  }, []);
 
   // Real-time coordinate simulation
   useEffect(() => {
@@ -107,6 +197,11 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
     return `${Math.round(speed)} KTS`;
   }, []);
 
+  // Handle show full history toggle
+  const handleShowFullHistory = useCallback(() => {
+    setShowFullHistory(prev => !prev);
+  }, []);
+
   // Control handlers
   const handleRecordToggle = useCallback(() => {
     setIsRecording(prev => {
@@ -134,6 +229,11 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
     const nextIndex = (currentIndex + 1) % rotationSteps.length;
     setRadarRotation(rotationSteps[nextIndex]);
   }, [radarRotation]);
+
+  // Handle north button (reset to north/0 degrees like Google Maps)
+  const handleResetToNorth = useCallback(() => {
+    setRadarRotation(0);
+  }, []);
 
   // Status indicator component
   const StatusIndicator: React.FC<{ status: string; color: string }> = ({ status, color }) => (
@@ -178,37 +278,37 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
       <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
         <div className="w-full max-w-7xl mx-auto">
           {/* Header Section */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-3 mb-4 px-6 py-3 rounded-2xl bg-slate-900/60 border border-cyan-400/30 backdrop-blur-md">
+          <div className="text-center mb-4">
+            <div className="inline-flex items-center gap-3 mb-3 px-6 py-3 rounded-2xl bg-slate-900/60 border border-cyan-400/30 backdrop-blur-md">
               <Activity className="w-6 h-6 text-cyan-400 animate-pulse" />
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-green-400 bg-clip-text text-transparent tracking-wider">
-                {flight.flightNumber || 'LNI080'}
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-green-400 bg-clip-text text-transparent tracking-wider">
+                {(realFlightData || flight).flightNumber || 'LNI080'}
               </h1>
             </div>
             <p className="text-cyan-300/80 font-mono text-lg tracking-wide">
-              {flight.origin || 'Indonesia'} → {flight.destination || 'Unknown'}
+              {(realFlightData || flight).origin || 'Indonesia'} → {(realFlightData || flight).destination || 'Unknown'}
             </p>
-            <div className="mt-3 text-xs text-slate-400 font-mono uppercase tracking-widest">
+            <div className="mt-2 text-xs text-slate-400 font-mono uppercase tracking-widest">
               REAL-TIME AVIATION RADAR
             </div>
           </div>
 
           {/* Main Grid Layout */}
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
             {/* Left Panel - Previous Coordinates */}
             <div className="xl:col-span-3 order-2 xl:order-1">
-              <div className="bg-slate-900/40 backdrop-blur-xl border border-cyan-400/20 rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-6">
+              <div className="bg-slate-900/40 backdrop-blur-xl border border-cyan-400/20 rounded-2xl p-3">
+                <div className="flex items-center gap-2 mb-3">
                   <Clock className="w-5 h-5 text-cyan-400" />
-                  <h2 className="text-lg font-semibold text-cyan-400 uppercase tracking-wider">
+                  <h2 className="text-base font-semibold text-cyan-400 uppercase tracking-wider">
                     Previous Coordinates
                   </h2>
                 </div>
                 
-                {coordinateHistory.slice(0, 2).map((coord, index) => (
-                  <div key={index} className="mb-4 last:mb-0">
+                {(showFullHistory ? flightHistory : coordinateHistory.slice(0, 2)).map((coord, index) => (
+                  <div key={index} className="mb-2 last:mb-0">
                     <CoordinatePanel
-                      title={`Position ${index + 1}`}
+                      title={showFullHistory ? `Position ${flightHistory.length - index}` : `Position ${index + 1}`}
                       latitude={coord.lat}
                       longitude={coord.lng}
                       altitude={coord.altitude}
@@ -216,45 +316,58 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
                     />
                   </div>
                 ))}
+                
+                {/* Show Full History Button */}
+                <div className="mt-3 pt-2 border-t border-slate-700/50">
+                  <button
+                    onClick={handleShowFullHistory}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-cyan-500/20 text-cyan-400 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/30 transition-all text-sm"
+                  >
+                    <History className="w-4 h-4" />
+                    {showFullHistory ? 'Show Recent Only' : 'Show Full History (50 positions)'}
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Center Panel - Radar Display */}
-            <div className="xl:col-span-6 order-1 xl:order-2 flex flex-col items-center space-y-8">
+            <div className="xl:col-span-6 order-1 xl:order-2 flex flex-col items-center space-y-4">
               {/* Radar Container */}
               <div className="relative flex flex-col items-center">
-                <RadarDisplay rotation={radarRotation} />
+                <RadarDisplay 
+                  sweepAngle={sweepAngle} 
+                  radarRotation={radarRotation} 
+                  flightNumber={(realFlightData || flight).flightNumber || '747'} 
+                     headingAngle={liveMetrics.heading}
+                />
                 
-                {/* Flight Info Overlay */}
-                <div className="mt-4">
-                  <div className="bg-slate-900/80 backdrop-blur-md border border-cyan-400/30 rounded-xl px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <Navigation className="w-4 h-4 text-cyan-400" />
-                      <span className="text-cyan-400 font-mono text-sm">
-                        FLIGHT {flight.flightNumber || '747'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+
               </div>
 
               {/* Control Buttons */}
-              <div className="w-full flex justify-center">
+              <div className="w-full flex justify-center gap-4">
                 <ControlButtons
                   isRecording={isRecording}
                   onRecordToggle={handleRecordToggle}
                   onRotateMap={handleRotateMap}
+               
                 />
               </div>
+
+              {/* Compass Component */}
+              <Compass 
+                radarRotation={radarRotation} 
+                onResetToNorth={handleResetToNorth} 
+              />
             </div>
 
             {/* Right Panel - Current Location & Status */}
-            <div className="xl:col-span-3 order-3 space-y-6">
+            <div className="xl:col-span-3 order-3 space-y-3">
               {/* Current Location */}
-              <div className="bg-slate-900/40 backdrop-blur-xl border border-cyan-400/20 rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-6">
+              <div className="bg-slate-900/40 backdrop-blur-xl border border-green-400/20 rounded-2xl p-3">
+                <div className="flex items-center gap-2 mb-3">
                   <MapPin className="w-5 h-5 text-green-400" />
-                  <h2 className="text-lg font-semibold text-green-400 uppercase tracking-wider">
+                  <h2 className="text-base font-semibold text-green-400 uppercase tracking-wider">
                     Current Location
                   </h2>
                 </div>
@@ -269,15 +382,15 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
               </div>
 
               {/* Flight Status Panel */}
-              <div className="bg-slate-900/40 backdrop-blur-xl border border-cyan-400/20 rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-6">
+              <div className="bg-slate-900/40 backdrop-blur-xl border border-green-400/20 rounded-2xl p-3">
+                <div className="flex items-center gap-2 mb-3">
                   <Gauge className="w-5 h-5 text-amber-400" />
-                  <h3 className="text-lg font-semibold text-amber-400 uppercase tracking-wider">
+                  <h3 className="text-base font-semibold text-amber-400 uppercase tracking-wider">
                     Flight Status
                   </h3>
                 </div>
                 
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <div className="flex justify-between items-center py-2 border-b border-slate-700/50">
                     <span className="text-slate-400 text-sm uppercase tracking-wide">Speed:</span>
                     <span className="text-white font-mono text-lg">{formatSpeed(liveMetrics.speed)}</span>
@@ -290,10 +403,14 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
                     <span className="text-slate-400 text-sm uppercase tracking-wide">Altitude:</span>
                     <span className="text-white font-mono text-lg">{formatAltitude(liveMetrics.altitude)}</span>
                   </div>
+                  <div className="flex justify-between items-center py-2 border-b border-slate-700/50">
+                    <span className="text-slate-400 text-sm uppercase tracking-wide">Aircraft:</span>
+                    <span className="text-white font-mono text-sm">{(realFlightData || flight).aircraft || 'Unknown'}</span>
+                  </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-slate-400 text-sm uppercase tracking-wide">Status:</span>
                     <StatusIndicator 
-                      status={flight.status?.toUpperCase() || 'ACTIVE'} 
+                      status={(realFlightData || flight).status?.toUpperCase() || 'ACTIVE'} 
                       color="#10B981" 
                     />
                   </div>
@@ -303,7 +420,7 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
           </div>
 
           {/* Footer Status Bar */}
-          <div className="mt-8 bg-slate-900/40 backdrop-blur-xl border border-cyan-400/20 rounded-2xl p-4">
+          <div className="mt-4 bg-slate-900/40 backdrop-blur-xl border border-green-400/20 rounded-2xl p-3">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
@@ -311,8 +428,8 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
                   <StatusIndicator status={systemStatus} color="#10B981" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <Compass className="w-4 h-4 text-cyan-400" />
-                  <span className="text-cyan-400 text-sm font-mono">Radar: {radarRotation}°</span>
+                  <CompassIcon className="w-4 h-4 text-green-400 transition-transform duration-300 ease-in-out" style={{ transform: `rotate(${radarRotation}deg)` }} />
+                  <span className="text-green-400 text-sm font-mono">Radar: {radarRotation}°</span>
                 </div>
               </div>
               <div className="text-slate-400 text-sm font-mono">
