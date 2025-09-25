@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Plane } from 'lucide-react';
+import AuthService from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SignupPageProps {
   onBack: () => void;
   onLogin: () => void;
+  onSuccess?: () => void;
 }
 
 interface SignupForm {
@@ -13,7 +16,8 @@ interface SignupForm {
   confirmPassword: string;
 }
 
-export const SignupPage: React.FC<SignupPageProps> = ({ onBack, onLogin }) => {
+export const SignupPage: React.FC<SignupPageProps> = ({ onBack, onLogin, onSuccess }) => {
+  const { login } = useAuth();
   const [formData, setFormData] = useState<SignupForm>({
     fullName: '',
     email: '',
@@ -63,14 +67,39 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onBack, onLogin }) => {
     setIsLoading(true);
     
     try {
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log('Signup successful:', formData);
+      const response = await AuthService.register(formData);
+      console.log('Signup successful:', response);
       
-      // Redirect to login or dashboard
-      onLogin();
-    } catch (error) {
+      // Update auth context with user data
+      if (response.success && response.data && response.data.user) {
+        login({
+          id: response.data.user._id,
+          fullName: response.data.user.fullName,
+          email: response.data.user.email
+        });
+      }
+      
+      // If there's a success callback (from flight click), use it
+      // Otherwise, redirect to login page
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        onLogin();
+      }
+    } catch (error: any) {
       console.error('Signup failed:', error);
+      
+      // Handle different types of errors
+      if (error.message.includes('email already exists') || error.message.includes('already registered')) {
+        setErrors({ email: 'Email address is already registered' });
+      } else if (error.message.includes('Validation failed')) {
+        // Handle validation errors from server
+        setErrors({ password: error.message });
+      } else if (error.message.includes('Password must contain')) {
+        setErrors({ password: 'Password must contain at least one lowercase letter, one uppercase letter, and one number' });
+      } else {
+        setErrors({ password: 'Registration failed. Please try again.' });
+      }
     } finally {
       setIsLoading(false);
     }

@@ -6,18 +6,22 @@ import { FlightDetailsPage } from './pages/FlightDetailsPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { useFlights } from './hooks/useFlights';
+import { useAuth } from './contexts/AuthContext';
 import { Flight } from './types/flight';
 import { MapPin, LogIn, UserPlus } from 'lucide-react';
+import AuthService from './services/authService';
 
 function App() {
   const {
     flights,
     loading,
   } = useFlights();
+  
+  const { user, isAuthenticated, login, logout, isLoading: authLoading } = useAuth();
 
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
   const [currentView, setCurrentView] = useState<'map' | 'flightDetails' | 'login' | 'signup'>('map');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [pendingFlightClick, setPendingFlightClick] = useState<Flight | null>(null);
 
 
   // Show all flights without filtering
@@ -26,14 +30,38 @@ function App() {
   }, [flights]);
 
   const handleFlightClick = useCallback((flight: Flight) => {
+    if (!isAuthenticated) {
+      // Store the flight for after authentication
+      setPendingFlightClick(flight);
+      // If not authenticated, redirect to signup page
+      setCurrentView('signup');
+      return;
+    }
+    
+    // If authenticated, show flight details
     setSelectedFlight(flight);
     setCurrentView('flightDetails');
     console.log('Flight clicked:', flight.flightNumber);
-  }, []);
+  }, [isAuthenticated]);
 
   const handleBackToMap = useCallback(() => {
     setSelectedFlight(null);
     setCurrentView('map');
+  }, []);
+
+  const handleAuthSuccess = useCallback(() => {
+    if (pendingFlightClick) {
+      // Show the flight details for the pending flight
+      setSelectedFlight(pendingFlightClick);
+      setCurrentView('flightDetails');
+      setPendingFlightClick(null);
+    } else {
+      setCurrentView('map');
+    }
+  }, [pendingFlightClick]);
+
+  const handleLoginFromSignup = useCallback(() => {
+    setCurrentView('login');
   }, []);
 
   const handleLogin = useCallback(() => {
@@ -44,18 +72,34 @@ function App() {
     setCurrentView('signup');
   }, []);
 
-  const handleLoginSuccess = useCallback(() => {
-    setIsAuthenticated(true);
-    setCurrentView('map');
-  }, []);
+  const handleLoginSuccess = useCallback(async () => {
+    try {
+      const userData = AuthService.getStoredUser();
+      if (userData) {
+        login({
+          id: userData._id || userData.id,
+          fullName: userData.fullName,
+          email: userData.email
+        });
+      }
+      setCurrentView('map');
+    } catch (error) {
+      console.error('Login success handler failed:', error);
+    }
+  }, [login]);
 
-  const handleLogout = useCallback(() => {
-    setIsAuthenticated(false);
-    setSelectedFlight(null);
-    setCurrentView('map');
-  }, []);
+  const handleLogout = useCallback(async () => {
+    try {
+      await AuthService.logout();
+      logout();
+      setSelectedFlight(null);
+      setCurrentView('map');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  }, [logout]);
 
-  if (loading) {
+  if (loading || authLoading) {
     return <LoadingSpinner />;
   }
 
@@ -67,6 +111,7 @@ function App() {
           onBack={handleBackToMap}
           onSignup={handleSignup}
           onLoginSuccess={handleLoginSuccess}
+          onSuccess={handleAuthSuccess}
         />
       </ErrorBoundary>
     );
@@ -78,7 +123,8 @@ function App() {
       <ErrorBoundary>
         <SignupPage
           onBack={handleBackToMap}
-          onLogin={handleLogin}
+          onLogin={handleLoginFromSignup}
+          onSuccess={handleAuthSuccess}
         />
       </ErrorBoundary>
     );
@@ -113,34 +159,20 @@ function App() {
               <span className="text-white font-semibold">Flight Tracker</span>
             </div>
             
-            {/* Authentication Buttons */}
-            <div className="flex items-center gap-3">
-              {isAuthenticated ? (
+            {/* User Info - Only show when authenticated */}
+            {isAuthenticated && (
+              <div className="flex items-center gap-3">
+                <span className="text-cyan-400 text-sm">
+                  Welcome, {user?.fullName || 'User'}
+                </span>
                 <button
                   onClick={handleLogout}
                   className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-400/30 rounded-lg hover:bg-red-500/30 transition-all"
                 >
                   Logout
                 </button>
-              ) : (
-                <>
-                  <button
-                    onClick={handleLogin}
-                    className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 text-cyan-400 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/30 transition-all"
-                  >
-                    <LogIn className="w-4 h-4" />
-                    Login
-                  </button>
-                  <button
-                    onClick={handleSignup}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 border border-green-400/30 rounded-lg hover:bg-green-500/30 transition-all"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    Sign Up
-                  </button>
-                </>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </header>
 

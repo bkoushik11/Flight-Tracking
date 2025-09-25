@@ -135,6 +135,14 @@ export const FlightMap: React.FC<FlightMapProps> = ({
             />
           </LayersControl.BaseLayer>
           
+          <LayersControl.BaseLayer name="Carto Voyager">
+            <TileLayer
+              attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              maxZoom={19}
+            />
+          </LayersControl.BaseLayer>
+          
           <LayersControl.BaseLayer name="Terrain">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

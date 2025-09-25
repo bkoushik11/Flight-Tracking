@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import AuthService from '../services/authService';
 
 interface User {
   id: string;
@@ -30,7 +31,32 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Initialize authentication on app start
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const isAuth = await AuthService.initializeAuth();
+        if (isAuth) {
+          const userData = AuthService.getStoredUser();
+          if (userData) {
+            setUser({
+              id: userData._id || userData.id,
+              fullName: userData.fullName,
+              email: userData.email
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Auth initialization failed:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+  }, []);
 
   const login = (userData: User) => {
     setUser(userData);
@@ -41,6 +67,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('auth_token');
   };
 
   const value: AuthContextType = {

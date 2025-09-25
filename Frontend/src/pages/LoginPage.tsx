@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, Plane } from 'lucide-react';
+import AuthService from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LoginPageProps {
   onBack: () => void;
   onSignup: () => void;
   onLoginSuccess: () => void;
+  onSuccess?: () => void;
 }
 
 interface LoginForm {
@@ -12,7 +15,8 @@ interface LoginForm {
   password: string;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSignup, onLoginSuccess }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSignup, onLoginSuccess, onSuccess }) => {
+  const { login } = useAuth();
   const [formData, setFormData] = useState<LoginForm>({
     email: '',
     password: ''
@@ -21,7 +25,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSignup, onLoginS
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<LoginForm>>({});
-  const [rememberMe, setRememberMe] = useState(false);
+
 
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginForm> = {};
@@ -48,15 +52,34 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSignup, onLoginS
     setIsLoading(true);
     
     try {
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log('Login successful:', formData);
+      const response = await AuthService.login(formData);
+      console.log('Login successful:', response);
       
-      // Redirect to dashboard
-      onLoginSuccess();
-    } catch (error) {
+      // Update auth context with user data
+      if (response.success && response.data && response.data.user) {
+        login({
+          id: response.data.user._id,
+          fullName: response.data.user.fullName,
+          email: response.data.user.email
+        });
+      }
+      
+      // If there's a success callback (from flight click), use it
+      // Otherwise, use the default login success handler
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        onLoginSuccess();
+      }
+    } catch (error: any) {
       console.error('Login failed:', error);
-      setErrors({ password: 'Invalid email or password' });
+      
+      // Handle different types of errors
+      if (error.message.includes('Invalid email or password')) {
+        setErrors({ password: 'Invalid email or password' });
+      } else {
+        setErrors({ password: 'Login failed. Please try again.' });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -166,17 +189,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSignup, onLoginS
                 )}
               </div>
 
-              {/* Remember Me & Forgot Password */}
-              <div className="flex items-center justify-between">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 text-cyan-500 bg-slate-800 border-slate-600 rounded focus:ring-cyan-500 focus:ring-2"
-                  />
-                  <span className="ml-2 text-sm text-slate-300">Remember me</span>
-                </label>
+              {/* Forgot Password */}
+              <div className="flex justify-end">
                 <button
                   type="button"
                   className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
@@ -209,26 +223,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onSignup, onLoginS
             </div>
           </div>
 
-          {/* Social Login */}
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-600"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-slate-900 text-slate-400">Or continue with</span>
-              </div>
-            </div>
-            
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button className="w-full py-3 px-4 border border-slate-600 bg-slate-800/50 hover:bg-slate-700/50 text-white font-medium rounded-lg transition-colors">
-                Google
-              </button>
-              <button className="w-full py-3 px-4 border border-slate-600 bg-slate-800/50 hover:bg-slate-700/50 text-white font-medium rounded-lg transition-colors">
-                GitHub
-              </button>
-            </div>
-          </div>
+
         </div>
       </div>
     </div>
