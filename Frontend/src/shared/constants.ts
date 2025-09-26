@@ -32,7 +32,7 @@ export const STATUS_BG_COLORS = {
 // Application configuration
 export const APP_CONFIG = {
   DEFAULT_FLIGHT_COUNT: 80,
-  UPDATE_INTERVAL: 3000,
+  UPDATE_INTERVAL: 10000, // Increased from 3000 to 10000 for more stable updates
   MAX_HISTORY_LENGTH: 50,
   ICON_CACHE_BUCKET_SIZE: 15, // Degrees
   THROTTLE_INTERVAL: 300, // Milliseconds

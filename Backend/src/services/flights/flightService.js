@@ -5,8 +5,8 @@ const { GEOGRAPHIC_BOUNDS } = require("../../utils/constants");
 const OPENSKY_API_BASE = 'https://opensky-network.org/api';
 const OPENSKY_AUTH_BASE = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
 const API_TIMEOUT = 15000; // 15 seconds
-const CACHE_DURATION = 60000; // 60 seconds
-const MIN_REQUEST_INTERVAL = 10000; // 10 seconds minimum for anonymous users (per OpenSky docs)
+const CACHE_DURATION = 10000; // Set to 10 seconds to match update interval
+const MIN_REQUEST_INTERVAL = 10000; // Set to 10 seconds to match update interval
 
 // India geographic boundaries
 const INDIA_BOUNDS = {
@@ -24,6 +24,8 @@ class FlightService {
       averageUpdateTime: 0
     };
     this.flightCache = new Map();
+    // Maintain rolling last-50 positions per flight id
+    this.flightHistories = new Map();
     this.lastFetchTime = 0;
     this.cacheDuration = CACHE_DURATION;
     this.rateLimitBackoff = 0; // Track rate limit backoff
@@ -125,8 +127,25 @@ class FlightService {
         return Array.from(this.flightCache.values());
       }
 
-      console.log('Fetching real flight data from OpenSky API...');
+      console.log('📡 Fetching real flight data from OpenSky API...');
       const flights = await this._fetchFromOpenSkyAPI();
+
+      // Update rolling histories per flight and stamp history onto objects
+      const nowTs = Date.now();
+      flights.forEach(f => {
+        const id = String(f.id);
+        const position = { lat: f.lat, lng: f.lng, alt: f.altitude, ts: nowTs };
+        if (!this.flightHistories.has(id)) {
+          this.flightHistories.set(id, []);
+        }
+        const arr = this.flightHistories.get(id);
+        arr.push(position);
+        if (arr.length > 50) {
+          arr.splice(0, arr.length - 50);
+        }
+        // attach copy of history to response object
+        f.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
+      });
       
       // Reset rate limit backoff on successful request
       this.rateLimitBackoff = 0;
@@ -141,6 +160,7 @@ class FlightService {
       this.lastFetchTime = currentTime;
       
       this._updateStats(currentTime);
+      console.log(`✅ Fetched and processed ${flights.length} flights from OpenSky API`);
       return flights;
       
     } catch (error) {
@@ -299,7 +319,7 @@ class FlightService {
           origin: origin_country || 'Unknown',
           destination: 'Unknown', // Would need additional API calls
           updatedAt: (last_contact || time_position || Date.now() / 1000) * 1000,
-          history: [{ lat, lng, ts: Date.now() }]
+          history: []
         });
         
       } catch (error) {
@@ -317,14 +337,39 @@ class FlightService {
     }
     
     try {
+      console.log(`🔍 Looking for flight ${id} in cache...`);
       // Check cache first
       if (this.flightCache.has(id)) {
-        return this.flightCache.get(id);
+        const cachedFlight = this.flightCache.get(id);
+        console.log(`✅ Found flight ${id} in cache`);
+        return cachedFlight;
       }
       
-      // If not in cache, fetch all flights to update cache
+      console.log(`🔄 Flight ${id} not in cache, fetching fresh data...`);
+      // Always fetch fresh data for individual flight requests if not in cache
       const flights = await this.getAllFlights();
-      return flights.find(flight => flight.id === id) || null;
+      const flight = flights.find(flight => flight.id === id) || null;
+      
+      // Update the flight history
+      if (flight) {
+        console.log(`✅ Found flight ${id} in fresh data`);
+        const nowTs = Date.now();
+        const position = { lat: flight.lat, lng: flight.lng, alt: flight.altitude, ts: nowTs };
+        if (!this.flightHistories.has(id)) {
+          this.flightHistories.set(id, []);
+        }
+        const arr = this.flightHistories.get(id);
+        arr.push(position);
+        if (arr.length > 50) {
+          arr.splice(0, arr.length - 50);
+        }
+        // attach copy of history to response object
+        flight.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
+      } else {
+        console.log(`⚠️ Flight ${id} not found in fresh data`);
+      }
+      
+      return flight;
     } catch (error) {
       console.error(`Error getting flight ${id}:`, error);
       return null;
@@ -388,4 +433,7 @@ class FlightService {
   }
 }
 
-module.exports = new FlightService();
+// Export the instance and the class
+const flightServiceInstance = new FlightService();
+module.exports = flightServiceInstance;
+module.exports.FlightService = FlightService;

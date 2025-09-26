@@ -23,16 +23,40 @@ let updateInterval;
 
 const fetchAndBroadcastFlights = async () => {
   try {
+    console.log('🔄 Fetching flights from OpenSky API at:', new Date().toISOString());
     const flights = await flightService.getAllFlights();
+    console.log(`📡 Broadcasting ${flights.length} flights to clients`);
     flightsGateway.broadcastFlightUpdate(flights);
+    
+    // Also broadcast individual flight updates for better real-time experience
+    flights.forEach(flight => {
+      // Update individual flight history
+      const nowTs = Date.now();
+      const position = { lat: flight.lat, lng: flight.lng, alt: flight.altitude, ts: nowTs };
+      if (!flightService.flightHistories.has(flight.id)) {
+        flightService.flightHistories.set(flight.id, []);
+      }
+      const arr = flightService.flightHistories.get(flight.id);
+      arr.push(position);
+      if (arr.length > 50) {
+        arr.splice(0, arr.length - 50);
+      }
+      // attach copy of history to response object
+      flight.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
+    });
+    
+    console.log(`✅ Broadcasted ${flights.length} flights at:`, new Date().toISOString());
   } catch (error) {
     console.error('Error fetching flights:', error);
   }
 };
 
-// Start periodic updates for real-time data
+// Add additional logging for periodic updates
 const startPeriodicUpdates = () => {
-  updateInterval = setInterval(fetchAndBroadcastFlights, TICK_MS);
+  updateInterval = setInterval(() => {
+    console.log('⏰ Triggering periodic flight update at:', new Date().toISOString());
+    fetchAndBroadcastFlights();
+  }, TICK_MS);
   console.log(`🔄 Started periodic flight updates every ${TICK_MS}ms`);
 };
 

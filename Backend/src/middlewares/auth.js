@@ -30,6 +30,10 @@ class AuthMiddleware {
    * @returns {string|null} JWT token or null
    */
   static extractToken(req) {
+    // Support token via query param for media elements that cannot set headers
+    if (req.query && typeof req.query.token === 'string' && req.query.token.length > 0) {
+      return req.query.token;
+    }
     const authHeader = req.headers.authorization;
     
     if (authHeader && authHeader.startsWith('Bearer ')) {

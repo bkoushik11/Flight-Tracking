@@ -4,7 +4,7 @@ interface CoordinatePanelProps {
   title: string;
   latitude: number;
   longitude: number;
-  altitude: number;
+  altitude?: number; // Made altitude optional
   timestamp?: string;
 }
 
@@ -36,12 +36,15 @@ const CoordinatePanel: React.FC<CoordinatePanelProps> = ({
           </span>
         </div>
         
-        <div className="flex justify-between items-center">
-          <span className="text-xs text-gray-400">ALT:</span>
-          <span className="text-sm text-white font-mono">
-            {altitude.toLocaleString()} FT
-          </span>
-        </div>
+        {/* Conditionally render altitude if provided */}
+        {altitude !== undefined && (
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-gray-400">ALT:</span>
+            <span className="text-sm text-white font-mono">
+              {altitude.toLocaleString()} FT
+            </span>
+          </div>
+        )}
         
         {timestamp && (
           <div className="pt-2 border-t border-green-400/20">

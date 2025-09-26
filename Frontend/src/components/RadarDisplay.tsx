@@ -79,7 +79,7 @@ const RadarDisplay: React.FC<RadarDisplayProps> = ({
       <div className="absolute top-1/2 left-1/2 w-0 h-0">
         <div
           className="relative"
-          style={{ transform: `rotate(${headingAngle - radarRotation - 50}deg)` }}
+          style={{ transform: `rotate(${headingAngle - radarRotation - 45}deg)` }}
         >
           <Plane className="absolute top-0 left-0 w-6 h-6 text-green-400 drop-shadow-lg transform -translate-x-1/2 -translate-y-1/2" />
           <div className="absolute top-0 left-0 w-6 h-6 bg-green-400/20 rounded-full animate-ping transform -translate-x-1/2 -translate-y-1/2" />

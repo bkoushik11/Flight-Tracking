@@ -11,7 +11,7 @@ export interface FlightApiResponse {
 // Local storage for flight data caching
 let flightCache: Flight[] = [];
 let lastFetchTime = 0;
-const CACHE_DURATION = 5000; // 5 seconds
+const CACHE_DURATION = 2000; // Set to 2 seconds for responsive updates while avoiding excessive requests
 
 export class FlightService {
   async getFlights(params?: {
@@ -103,21 +103,24 @@ export class FlightService {
     return { flights: paged, total: flights.length, page, limit };
   }
 
-  async getFlightById(id: string): Promise<Flight | null> {
+  async getFlightById(id: string, opts?: { refresh?: boolean }): Promise<Flight | null> {
     try {
-      // Check cache first
-      const cachedFlight = flightCache.find(f => f.id === id);
-      if (cachedFlight) {
-        return cachedFlight;
+      // Check cache first unless refresh explicitly requested
+      if (!opts?.refresh) {
+        const cachedFlight = flightCache.find(f => f.id === id);
+        if (cachedFlight) {
+          return cachedFlight;
+        }
       }
 
       // Fetch from API
-      const f = await httpGet<any>(`/flights/${id}`);
+      const refreshQuery = opts?.refresh ? '?refresh=1' : '';
+      const f = await httpGet<any>(`/flights/${id}${refreshQuery}`);
       const status = String(f.status || 'on-time').replace(' ', '-');
       const path = Array.isArray(f.history)
         ? f.history.map((h: any) => [Number(h.lat), Number(h.lng)] as [number, number])
         : [];
-      return {
+      const mapped: Flight = {
         id: String(f.id),
         flightNumber: String(f.flightNumber || f.id || 'FL-000'),
         latitude: Number(f.lat ?? f.latitude ?? 0),
@@ -132,6 +135,16 @@ export class FlightService {
         lastUpdate: new Date(f.updatedAt ?? Date.now()),
         path,
       };
+
+      // Update cache entry for this flight
+      const idx = flightCache.findIndex(fl => fl.id === mapped.id);
+      if (idx >= 0) {
+        flightCache[idx] = mapped;
+      } else {
+        flightCache.push(mapped);
+      }
+
+      return mapped;
     } catch (error) {
       console.error('Error fetching flight by ID:', error);
       return null;

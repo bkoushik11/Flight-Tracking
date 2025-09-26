@@ -4,6 +4,7 @@ import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FlightDetailsPage } from './pages/FlightDetailsPage';
 import { LoginPage } from './pages/LoginPage';
+import RecordingsPage from './pages/RecordingsPage';
 import { SignupPage } from './pages/SignupPage';
 import { useFlights } from './hooks/useFlights';
 import { useAuth } from './contexts/AuthContext';
@@ -20,7 +21,7 @@ function App() {
   const { user, isAuthenticated, login, logout, isLoading: authLoading } = useAuth();
 
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
-  const [currentView, setCurrentView] = useState<'map' | 'flightDetails' | 'login' | 'signup'>('map');
+  const [currentView, setCurrentView] = useState<'map' | 'flightDetails' | 'login' | 'signup' | 'recordings'>('map');
   const [pendingFlightClick, setPendingFlightClick] = useState<Flight | null>(null);
 
 
@@ -142,6 +143,14 @@ function App() {
     );
   }
 
+  if (currentView === 'recordings') {
+    return (
+      <ErrorBoundary>
+        <RecordingsPage onBack={() => setCurrentView('map')} />
+      </ErrorBoundary>
+    );
+  }
+
   // Show Main Map View
   return (
     <ErrorBoundary>
@@ -165,6 +174,12 @@ function App() {
                 <span className="text-cyan-400 text-sm">
                   Welcome, {user?.fullName || 'User'}
                 </span>
+                <button
+                  onClick={() => setCurrentView('recordings')}
+                  className="px-4 py-2 bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/30 transition-all"
+                >
+                  Show Recordings
+                </button>
                 <button
                   onClick={handleLogout}
                   className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-400/30 rounded-lg hover:bg-red-500/30 transition-all"

@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Flight } from '../types/flight';
-import { ArrowLeft, Activity, MapPin, Clock, Navigation, Gauge, History, Compass as CompassIcon } from 'lucide-react';
+import { ArrowLeft, Activity, Compass as CompassIcon } from 'lucide-react';
 import RadarDisplay from '../components/RadarDisplay';
-import CoordinatePanel from '../components/CoordinatePanel';
 import ControlButtons from '../components/ControlButtons';
 import Compass from '../components/Compass';
 import { flightService } from '../services/flightService';
+import { recordingService } from '../services/recordingService';
+import AuthService from '../services/authService';
+import { io, Socket } from 'socket.io-client';
+import FlightHistoryPanel from '../components/FlightHistoryPanel';
+import FlightStatusPanel from '../components/FlightStatusPanel';
 
 interface FlightDetailsPageProps {
   flight: Flight;
@@ -34,12 +38,20 @@ interface LiveMetrics {
 export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, onBack }) => {
   // State Management
   const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<BlobPart[]>([]);
+  const recordStartRef = useRef<number | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [radarRotation, setRadarRotation] = useState(0);
-  const [systemStatus, setSystemStatus] = useState<'ONLINE' | 'OFFLINE' | 'MAINTENANCE'>('ONLINE');
+  const [systemStatus] = useState<'ONLINE' | 'OFFLINE' | 'MAINTENANCE'>('ONLINE');
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [showFullHistory, setShowFullHistory] = useState(false);
   const [flightHistory, setFlightHistory] = useState<CoordinateHistory[]>([]);
   const [realFlightData, setRealFlightData] = useState<Flight | null>(null);
+  
+  // WebSocket reference
+  const socketRef = useRef<Socket | null>(null);
   
   // Radar animation states
   const [sweepAngle, setSweepAngle] = useState(0);
@@ -47,7 +59,7 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
   
   // Live flight metrics with real-time simulation
   const [liveMetrics, setLiveMetrics] = useState<LiveMetrics>(() => {
-    const currentFlight = realFlightData || flight;
+    const currentFlight = flight; // Always use the passed flight prop for initial state
     return {
       latitude: currentFlight.latitude || 34.0522,
       longitude: currentFlight.longitude || -118.2437,
@@ -59,32 +71,204 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
     };
   });
   
+  // Log when liveMetrics changes
+  useEffect(() => {
+    console.log('📊 Live metrics updated:', liveMetrics);
+  }, [liveMetrics]);
+  
   // Coordinate history for tracking
-  const [coordinateHistory, setCoordinateHistory] = useState<CoordinateHistory[]>([
-    {
-      lat: 34.0522,
-      lng: -118.2437,
-      altitude: 15000,
-      timestamp: Date.now() - 6 * 60 * 1000,
-      speed: 420,
-      heading: 270
-    },
-    {
-      lat: 34.0522,
-      lng: -118.2437,
-      altitude: 15000,
-      timestamp: Date.now() - 4 * 60 * 1000,
-      speed: 435,
-      heading: 272
-    }
-  ]);
+  const [coordinateHistory, setCoordinateHistory] = useState<CoordinateHistory[]>([]);
 
-  // Fetch real flight data from OpenSky API
+  // Initialize WebSocket connection for real-time updates
+  useEffect(() => {
+    const baseUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
+    const socketUrl = baseUrl.replace('/api', '');
+    
+    console.log('🔌 Connecting to backend socket for flight details at:', socketUrl);
+    console.log('🎯 Subscribing to flight ID:', flight.id);
+    
+    const socket = io(socketUrl, {
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelayMax: 10000,
+      reconnectionDelay: 1000,
+      timeout: 20000,
+      forceNew: true
+    });
+    
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('✅ Socket connected to backend for flight details!');
+      // Subscribe to updates for this specific flight
+      socket.emit('subscribe_flight', { id: flight.id });
+    });
+
+    socket.on('disconnect', (reason: any) => {
+      console.log('❌ Socket disconnected for flight details:', reason);
+    });
+
+    socket.on('connect_error', (error: any) => {
+      console.log('🔴 Socket connection error for flight details:', error);
+    });
+
+    // Handle real-time flight updates
+    socket.on('flight', (updatedFlight: any) => {
+      try {
+        console.log('✈️ Received real-time update for flight:', {
+          id: updatedFlight.id,
+          flightNumber: updatedFlight.flightNumber,
+          lat: updatedFlight.lat,
+          lng: updatedFlight.lng,
+          altitude: updatedFlight.altitude,
+          speed: updatedFlight.speed,
+          heading: updatedFlight.heading,
+          updatedAt: new Date(updatedFlight.updatedAt)
+        });
+        
+        // Verify this update is for the correct flight
+        if (updatedFlight.id !== flight.id) {
+          console.log('⚠️ Received update for different flight, ignoring:', updatedFlight.id);
+          return;
+        }
+        
+        // Map backend flight shape to frontend
+        const mappedFlight: Flight = {
+          id: String(updatedFlight.id),
+          flightNumber: String(updatedFlight.flightNumber || updatedFlight.id || 'FL-000'),
+          latitude: Number(updatedFlight.lat ?? updatedFlight.latitude ?? 0),
+          longitude: Number(updatedFlight.lng ?? updatedFlight.longitude ?? 0),
+          altitude: Number(updatedFlight.altitude ?? 0),
+          speed: Number(updatedFlight.speed ?? 0),
+          heading: Number(updatedFlight.heading ?? 0),
+          status: String(updatedFlight.status || 'on-time').replace(' ', '-') as any,
+          aircraft: String(updatedFlight.aircraft || 'Unknown'),
+          origin: String(updatedFlight.origin || 'N/A'),
+          destination: String(updatedFlight.destination || 'N/A'),
+          lastUpdate: new Date(updatedFlight.updatedAt ?? Date.now()),
+          path: Array.isArray(updatedFlight.history) 
+            ? updatedFlight.history.map((h: any) => [Number(h.lat), Number(h.lng)] as [number, number]) 
+            : [],
+        };
+
+        // Update the real flight data
+        setRealFlightData(mappedFlight);
+        
+        // Update live metrics
+        setLiveMetrics({
+          latitude: mappedFlight.latitude,
+          longitude: mappedFlight.longitude,
+          altitude: mappedFlight.altitude,
+          speed: mappedFlight.speed,
+          heading: mappedFlight.heading,
+          verticalSpeed: 0,
+          groundSpeed: mappedFlight.speed
+        });
+        
+        // Update last update timestamp
+        setLastUpdate(Date.now());
+        
+        // Add to flight history only when position changes
+        const newPoint: CoordinateHistory = {
+          lat: mappedFlight.latitude,
+          lng: mappedFlight.longitude,
+          altitude: mappedFlight.altitude,
+          timestamp: Date.now(),
+          speed: mappedFlight.speed,
+          heading: mappedFlight.heading
+        };
+
+        // Update history only when position changes significantly
+        setFlightHistory(prev => {
+          const last = prev[0];
+          
+          // If no previous history, add the new point
+          if (!last) {
+            return [newPoint];
+          }
+          
+          // Check if position has changed significantly
+          const isSame = Math.abs(last.lat - newPoint.lat) < 1e-7 && Math.abs(last.lng - newPoint.lng) < 1e-7;
+          const hasMoved = Math.abs(last.lat - newPoint.lat) > 1e-4 || Math.abs(last.lng - newPoint.lng) > 1e-4;
+          const shouldUpdate = !isSame || hasMoved;
+          
+          if (shouldUpdate) {
+            const next = [newPoint, ...prev];
+            return next.length > 50 ? next.slice(0, 50) : next;
+          }
+          return prev;
+        });
+
+        setCoordinateHistory(prev => {
+          const last = prev[0];
+          
+          // If no previous history, add the new point
+          if (!last) {
+            return [newPoint];
+          }
+          
+          // Check if position has changed significantly
+          const isSame = Math.abs(last.lat - newPoint.lat) < 1e-7 && Math.abs(last.lng - newPoint.lng) < 1e-7;
+          const hasMoved = Math.abs(last.lat - newPoint.lat) > 1e-4 || Math.abs(last.lng - newPoint.lng) > 1e-4;
+          const shouldUpdate = !isSame || hasMoved;
+          
+          if (shouldUpdate) {
+            const next = [newPoint, ...prev].slice(0, 2);
+            return next;
+          }
+          return prev;
+        });
+        
+        console.log('✅ Flight data updated successfully at:', new Date().toISOString());
+      } catch (error) {
+        console.error('Error processing flight update:', error);
+      }
+    });
+
+    // Handle errors
+    socket.on('error', (error: any) => {
+      console.log('🔴 Socket error for flight details:', error);
+    });
+
+    // Request periodic updates every 10 seconds to ensure we get updates even if WebSocket misses some
+    const updateInterval = setInterval(() => {
+      if (socketRef.current?.connected) {
+        console.log('🔄 Requesting flight update for:', flight.id);
+        socketRef.current.emit('subscribe_flight', { id: flight.id });
+      }
+    }, 10000);
+
+    return () => {
+      // Clear the interval
+      clearInterval(updateInterval);
+      
+      // Unsubscribe from flight updates
+      if (socketRef.current) {
+        console.log('📤 Unsubscribing from flight:', flight.id);
+        socketRef.current.emit('unsubscribe_flight', { id: flight.id });
+        socketRef.current.disconnect();
+      }
+    };
+  }, [flight.id]);
+
+  // Fetch real flight data from backend (which uses OpenSky API) and seed initial history
   useEffect(() => {
     const fetchRealFlightData = async () => {
       try {
-        const realData = await flightService.getFlightById(flight.id);
+        // Always force refresh for initial data load
+        const realData = await flightService.getFlightById(flight.id, { refresh: true });
         if (realData) {
+          console.log('🛫 Initial flight data loaded:', {
+            id: realData.id,
+            flightNumber: realData.flightNumber,
+            lat: realData.latitude,
+            lng: realData.longitude,
+            altitude: realData.altitude,
+            speed: realData.speed,
+            heading: realData.heading
+          });
+          
           setRealFlightData(realData);
           setLiveMetrics({
             latitude: realData.latitude || flight.latitude || 34.0522,
@@ -96,22 +280,56 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
             groundSpeed: realData.speed || flight.speed || 450
           });
           
-          // Generate history positions (simulate past 50 positions)
-          const history: CoordinateHistory[] = [];
-          for (let i = 50; i > 0; i--) {
-            const timeOffset = i * 2 * 60 * 1000; // 2 minutes apart
-            const latOffset = (Math.random() - 0.5) * 0.01 * i * 0.1;
-            const lngOffset = (Math.random() - 0.5) * 0.01 * i * 0.1;
-            history.push({
-              lat: (realData.latitude || 34.0522) + latOffset,
-              lng: (realData.longitude || -118.2437) + lngOffset,
-              altitude: Math.max(10000, (realData.altitude || 19815) + (Math.random() - 0.5) * 2000),
-              timestamp: Date.now() - timeOffset,
-              speed: Math.max(200, (realData.speed || 450) + (Math.random() - 0.5) * 50),
-              heading: ((realData.heading || 275) + (Math.random() - 0.5) * 20) % 360
-            });
-          }
-          setFlightHistory(history);
+          // Create new point for history
+          const newPoint: CoordinateHistory = {
+            lat: realData.latitude || 0,
+            lng: realData.longitude || 0,
+            altitude: realData.altitude || 0,
+            timestamp: Date.now(),
+            speed: realData.speed,
+            heading: realData.heading
+          };
+
+          // Update history only when position changes significantly
+          setFlightHistory(prev => {
+            const last = prev[0];
+            
+            // If no previous history, add the new point
+            if (!last) {
+              return [newPoint];
+            }
+            
+            // Check if position has changed significantly
+            const isSame = Math.abs(last.lat - newPoint.lat) < 1e-7 && Math.abs(last.lng - newPoint.lng) < 1e-7;
+            const hasMoved = Math.abs(last.lat - newPoint.lat) > 1e-4 || Math.abs(last.lng - newPoint.lng) > 1e-4;
+            const shouldUpdate = !isSame || hasMoved;
+            
+            if (shouldUpdate) {
+              const next = [newPoint, ...prev];
+              return next.length > 50 ? next.slice(0, 50) : next;
+            }
+            return prev;
+          });
+          
+          setCoordinateHistory(prev => {
+            const last = prev[0];
+            
+            // If no previous history, add the new point
+            if (!last) {
+              return [newPoint];
+            }
+            
+            // Check if position has changed significantly
+            const isSame = Math.abs(last.lat - newPoint.lat) < 1e-7 && Math.abs(last.lng - newPoint.lng) < 1e-7;
+            const hasMoved = Math.abs(last.lat - newPoint.lat) > 1e-4 || Math.abs(last.lng - newPoint.lng) > 1e-4;
+            const shouldUpdate = !isSame || hasMoved;
+            
+            if (shouldUpdate) {
+              const next = [newPoint, ...prev].slice(0, 2);
+              return next;
+            }
+            return prev;
+          });
         }
       } catch (error) {
         console.error('Error fetching real flight data:', error);
@@ -119,7 +337,13 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
     };
 
     fetchRealFlightData();
-  }, [flight.id, flight.latitude, flight.longitude, flight.altitude, flight.speed, flight.heading]);
+    
+    // The WebSocket connection will handle real-time updates
+    // This initial fetch just provides immediate data while WebSocket connects
+  }, [flight.id]);
+
+  // Poll backend for the selected flight and maintain last 50 positions
+  // DEPRECATED: Now using WebSocket for real-time updates
 
   // Smooth radar sweep animation - runs continuously with smooth 360 rotation
   useEffect(() => {
@@ -157,25 +381,6 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
     };
   }, []);
 
-  // Real-time coordinate simulation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLiveMetrics(prev => ({
-        ...prev,
-        latitude: prev.latitude + (Math.random() - 0.5) * 0.0001,
-        longitude: prev.longitude + (Math.random() - 0.5) * 0.0001,
-        altitude: Math.max(15000, prev.altitude + (Math.random() - 0.5) * 50),
-        speed: Math.max(200, prev.speed + (Math.random() - 0.5) * 10),
-        heading: (prev.heading + (Math.random() - 0.5) * 2) % 360,
-        verticalSpeed: (Math.random() - 0.5) * 1000,
-        groundSpeed: Math.max(200, prev.speed + (Math.random() - 0.5) * 20)
-      }));
-      setLastUpdate(Date.now());
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
-
   // Utility functions
   const formatTime = useCallback((timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString('en-US', {
@@ -183,10 +388,6 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
       minute: '2-digit',
       hour12: true
     });
-  }, []);
-
-  const formatCoordinate = useCallback((coord: number, precision: number = 4) => {
-    return coord.toFixed(precision);
   }, []);
 
   const formatAltitude = useCallback((alt: number) => {
@@ -203,10 +404,39 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
   }, []);
 
   // Control handlers
-  const handleRecordToggle = useCallback(() => {
-    setIsRecording(prev => {
-      if (!prev) {
-        // Start recording - add current position to history
+  const handleRecordToggle = useCallback(async () => {
+    if (!isRecording) {
+      try {
+        const stream = await (navigator.mediaDevices as any).getDisplayMedia({ video: true, audio: true });
+        const options: MediaRecorderOptions = { mimeType: 'video/webm;codecs=vp9,opus' } as any;
+        const mediaRecorder = new MediaRecorder(stream, options);
+        recordedChunksRef.current = [];
+        recordStartRef.current = Date.now();
+        mediaRecorder.ondataavailable = (e: BlobEvent) => {
+          if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
+        };
+        mediaRecorder.onstop = async () => {
+          try {
+            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+            const durationMs = recordStartRef.current ? Date.now() - recordStartRef.current : undefined;
+            if (!AuthService.isAuthenticated()) return;
+            setUploading(true);
+            await recordingService.uploadRecording(blob, {
+              title: `${(realFlightData || flight).flightNumber || 'Flight'}-${new Date().toISOString()}`,
+              flightId: (flight as any).id || (realFlightData as any)?.id,
+              flightNumber: (realFlightData || flight).flightNumber,
+              durationMs
+            });
+            setUploadSuccess('Recording saved successfully');
+          } catch (err) {
+            console.error('Upload error:', err);
+          } finally {
+            setUploading(false);
+          }
+        };
+        mediaRecorder.start();
+        mediaRecorderRef.current = mediaRecorder;
+        // UI history addition
         setCoordinateHistory(prevHistory => [
           {
             lat: liveMetrics.latitude,
@@ -218,10 +448,18 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
           },
           ...prevHistory.slice(0, 1)
         ]);
+        setIsRecording(true);
+      } catch (e) {
+        console.error('Failed to start recording:', e);
       }
-      return !prev;
-    });
-  }, [liveMetrics]);
+    } else {
+      try {
+        mediaRecorderRef.current?.stop();
+        mediaRecorderRef.current?.stream.getTracks().forEach(t => t.stop());
+      } catch {}
+      setIsRecording(false);
+    }
+  }, [isRecording, liveMetrics, realFlightData, flight]);
 
   const handleRotateMap = useCallback(() => {
     const rotationSteps = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -250,6 +488,24 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-slate-900 to-gray-950 relative overflow-hidden">
+      {/* Custom scrollbar styles */}
+      <style>{`
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+          background: rgba(51, 65, 85, 0.3);
+          border-radius: 4px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background: rgba(6, 182, 212, 0.3);
+          border-radius: 4px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+          background: rgba(6, 182, 212, 0.5);
+        }
+      `}</style>
+      
       {/* Animated Background Grid */}
       <div className="fixed inset-0 opacity-20">
         <div 
@@ -282,11 +538,11 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
             <div className="inline-flex items-center gap-3 mb-3 px-6 py-3 rounded-2xl bg-slate-900/60 border border-cyan-400/30 backdrop-blur-md">
               <Activity className="w-6 h-6 text-cyan-400 animate-pulse" />
               <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-green-400 bg-clip-text text-transparent tracking-wider">
-                {(realFlightData || flight).flightNumber || 'LNI080'}
+                {realFlightData?.flightNumber || flight.flightNumber || 'LNI080'}
               </h1>
             </div>
             <p className="text-cyan-300/80 font-mono text-lg tracking-wide">
-              {(realFlightData || flight).origin || 'Indonesia'} → {(realFlightData || flight).destination || 'Unknown'}
+              {realFlightData?.origin || flight.origin || 'Indonesia'} → {realFlightData?.destination || flight.destination || 'Unknown'}
             </p>
             <div className="mt-2 text-xs text-slate-400 font-mono uppercase tracking-widest">
               REAL-TIME AVIATION RADAR
@@ -297,37 +553,13 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
             {/* Left Panel - Previous Coordinates */}
             <div className="xl:col-span-3 order-2 xl:order-1">
-              <div className="bg-slate-900/40 backdrop-blur-xl border border-cyan-400/20 rounded-2xl p-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <Clock className="w-5 h-5 text-cyan-400" />
-                  <h2 className="text-base font-semibold text-cyan-400 uppercase tracking-wider">
-                    Previous Coordinates
-                  </h2>
-                </div>
-                
-                {(showFullHistory ? flightHistory : coordinateHistory.slice(0, 2)).map((coord, index) => (
-                  <div key={index} className="mb-2 last:mb-0">
-                    <CoordinatePanel
-                      title={showFullHistory ? `Position ${flightHistory.length - index}` : `Position ${index + 1}`}
-                      latitude={coord.lat}
-                      longitude={coord.lng}
-                      altitude={coord.altitude}
-                      timestamp={formatTime(coord.timestamp)}
-                    />
-                  </div>
-                ))}
-                
-                {/* Show Full History Button */}
-                <div className="mt-3 pt-2 border-t border-slate-700/50">
-                  <button
-                    onClick={handleShowFullHistory}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-cyan-500/20 text-cyan-400 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/30 transition-all text-sm"
-                  >
-                    <History className="w-4 h-4" />
-                    {showFullHistory ? 'Show Recent Only' : 'Show Full History (50 positions)'}
-                  </button>
-                </div>
-              </div>
+              <FlightHistoryPanel
+                showFullHistory={showFullHistory}
+                flightHistory={flightHistory}
+                coordinateHistory={coordinateHistory}
+                onToggleHistory={handleShowFullHistory}
+                formatTime={formatTime}
+              />
             </div>
 
             {/* Center Panel - Radar Display */}
@@ -337,8 +569,8 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
                 <RadarDisplay 
                   sweepAngle={sweepAngle} 
                   radarRotation={radarRotation} 
-                  flightNumber={(realFlightData || flight).flightNumber || '747'} 
-                     headingAngle={liveMetrics.heading}
+                  flightNumber={realFlightData?.flightNumber || flight.flightNumber || '747'} 
+                  headingAngle={liveMetrics.heading}
                 />
                 
 
@@ -353,6 +585,12 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
                
                 />
               </div>
+              {uploading && (
+                <div className="text-sm text-cyan-300">Uploading recording...</div>
+              )}
+              {uploadSuccess && (
+                <div className="text-sm text-green-400">{uploadSuccess}</div>
+              )}
 
               {/* Compass Component */}
               <Compass 
@@ -362,60 +600,18 @@ export const FlightDetailsPage: React.FC<FlightDetailsPageProps> = ({ flight, on
             </div>
 
             {/* Right Panel - Current Location & Status */}
-            <div className="xl:col-span-3 order-3 space-y-3">
-              {/* Current Location */}
-              <div className="bg-slate-900/40 backdrop-blur-xl border border-green-400/20 rounded-2xl p-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <MapPin className="w-5 h-5 text-green-400" />
-                  <h2 className="text-base font-semibold text-green-400 uppercase tracking-wider">
-                    Current Location
-                  </h2>
-                </div>
-                
-                <CoordinatePanel
-                  title="Live Position"
-                  latitude={liveMetrics.latitude}
-                  longitude={liveMetrics.longitude}
-                  altitude={liveMetrics.altitude}
-                  timestamp={formatTime(lastUpdate)}
-                />
-              </div>
-
-              {/* Flight Status Panel */}
-              <div className="bg-slate-900/40 backdrop-blur-xl border border-green-400/20 rounded-2xl p-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <Gauge className="w-5 h-5 text-amber-400" />
-                  <h3 className="text-base font-semibold text-amber-400 uppercase tracking-wider">
-                    Flight Status
-                  </h3>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center py-2 border-b border-slate-700/50">
-                    <span className="text-slate-400 text-sm uppercase tracking-wide">Speed:</span>
-                    <span className="text-white font-mono text-lg">{formatSpeed(liveMetrics.speed)}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-slate-700/50">
-                    <span className="text-slate-400 text-sm uppercase tracking-wide">Heading:</span>
-                    <span className="text-white font-mono text-lg">{Math.round(liveMetrics.heading)}°</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-slate-700/50">
-                    <span className="text-slate-400 text-sm uppercase tracking-wide">Altitude:</span>
-                    <span className="text-white font-mono text-lg">{formatAltitude(liveMetrics.altitude)}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-slate-700/50">
-                    <span className="text-slate-400 text-sm uppercase tracking-wide">Aircraft:</span>
-                    <span className="text-white font-mono text-sm">{(realFlightData || flight).aircraft || 'Unknown'}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-slate-400 text-sm uppercase tracking-wide">Status:</span>
-                    <StatusIndicator 
-                      status={(realFlightData || flight).status?.toUpperCase() || 'ACTIVE'} 
-                      color="#10B981" 
-                    />
-                  </div>
-                </div>
-              </div>
+            <div className="xl:col-span-3 order-3">
+              <FlightStatusPanel
+                liveMetrics={liveMetrics}
+                realFlightData={realFlightData}
+                flight={flight}
+                lastUpdate={lastUpdate}
+                systemStatus={systemStatus}
+                radarRotation={radarRotation}
+                formatTime={formatTime}
+                formatAltitude={formatAltitude}
+                formatSpeed={formatSpeed}
+              />
             </div>
           </div>
 

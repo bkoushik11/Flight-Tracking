@@ -17,7 +17,10 @@ class FlightsController {
         return res.status(400).json({ error: "Validation Error", message: "id is required" });
       }
 
-      const flight = await flightService.getFlight(id);
+      // Always force a fresh pull for individual flight requests to ensure live data
+      const freshList = await flightService.getAllFlights();
+      const flight = freshList.find(f => String(f.id) === id) || null;
+      
       if (!flight) {
         return res.status(404).json({ error: "Flight not found", message: `No flight found with ID: ${id}` });
       }

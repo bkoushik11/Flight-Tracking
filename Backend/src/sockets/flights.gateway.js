@@ -70,10 +70,31 @@ class FlightsGateway {
     }
 
     try {
-      const flight = await flightService.getFlight(id);
+      console.log(`📥 Client ${socket.id} subscribed to flight ${id}`);
+      // Force refresh to get the latest data for this flight
+      const flights = await flightService.getAllFlights();
+      const flight = flights.find(f => f.id === id) || null;
+      
       if (flight) {
+        // Update flight history before sending
+        const nowTs = Date.now();
+        const position = { lat: flight.lat, lng: flight.lng, alt: flight.altitude, ts: nowTs };
+        if (!flightService.flightHistories.has(id)) {
+          flightService.flightHistories.set(id, []);
+        }
+        const arr = flightService.flightHistories.get(id);
+        arr.push(position);
+        if (arr.length > 50) {
+          arr.splice(0, arr.length - 50);
+        }
+        // attach copy of history to response object
+        flight.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
+        
         socket.emit("flight", flight);
+        console.log(`📤 Sent initial flight data for ${id} to client ${socket.id}`);
+        console.log(`   Position: ${flight.lat.toFixed(4)}, ${flight.lng.toFixed(4)} | Alt: ${flight.altitude} | Speed: ${flight.speed}`);
       } else {
+        console.log(`⚠️ Flight ${id} not found for client ${socket.id}`);
         socket.emit("error", { message: `Flight ${id} not found` });
       }
     } catch (error) {
@@ -125,7 +146,13 @@ class FlightsGateway {
 
       // Broadcast individual flight updates to subscribed clients
       flights.forEach((flight) => {
-        this.io.to(this._flightRoom(flight.id)).emit("flight", flight);
+        const room = this._flightRoom(flight.id);
+        const roomSize = this.io.sockets.adapter.rooms.get(room)?.size || 0;
+        if (roomSize > 0) {
+          console.log(`📡 Broadcasting flight ${flight.id} to ${roomSize} subscribers at ${new Date().toISOString()}`);
+          console.log(`   Position: ${flight.lat.toFixed(4)}, ${flight.lng.toFixed(4)} | Alt: ${flight.altitude} | Speed: ${flight.speed}`);
+          this.io.to(room).emit("flight", flight);
+        }
       });
     } catch (error) {
       console.error("Error broadcasting flight updates:", error);
