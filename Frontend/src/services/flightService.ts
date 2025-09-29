@@ -11,7 +11,7 @@ export interface FlightApiResponse {
 // Local storage for flight data caching
 let flightCache: Flight[] = [];
 let lastFetchTime = 0;
-const CACHE_DURATION = 2000; // Set to 2 seconds for responsive updates while avoiding excessive requests
+const CACHE_DURATION = 10000; // Increased to 10 seconds to match backend update interval
 
 export class FlightService {
   async getFlights(params?: {

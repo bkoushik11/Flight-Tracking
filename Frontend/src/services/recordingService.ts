@@ -61,10 +61,26 @@ export const recordingService = {
     return normalized as { success: boolean; data: RecordingMeta[] };
   },
 
+  async deleteRecording(id: string): Promise<{ success: boolean; message: string }> {
+    const token = AuthService.getStoredToken();
+    const res = await fetch(`${API_BASE_URL}/recordings/${id}`, {
+      method: 'DELETE',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+    
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Delete failed: ${res.status} ${res.statusText} ${text}`.trim());
+    }
+    
+    const json = await res.json();
+    return json as { success: boolean; message: string };
+  },
+
   getStreamUrl(id: string) {
     const token = AuthService.getStoredToken() || '';
     return `${API_BASE_URL}/recordings/${id}/stream?all=true&token=${encodeURIComponent(token)}`;
   }
 };
-
-

@@ -11,6 +11,7 @@ const RecordingsPage: React.FC<RecordingsPageProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -25,6 +26,33 @@ const RecordingsPage: React.FC<RecordingsPageProps> = ({ onBack }) => {
     };
     run();
   }, []);
+
+  const handleDelete = async (id: string, title: string) => {
+    // Confirm deletion
+    if (!window.confirm(`Are you sure you want to delete the recording "${title}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setDeletingId(id);
+      await recordingService.deleteRecording(id);
+      
+      // Remove the deleted item from the list
+      setItems(prevItems => prevItems.filter(item => item._id !== id));
+      
+      // Close the player if it was open for this recording
+      if (openId === id) {
+        setOpenId(null);
+      }
+      
+      // Show success message
+      alert('Recording deleted successfully');
+    } catch (e: any) {
+      setError(e.message || 'Failed to delete recording');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4">
@@ -50,12 +78,21 @@ const RecordingsPage: React.FC<RecordingsPageProps> = ({ onBack }) => {
                   </button>
                   <div className="text-xs text-slate-400">{new Date(item.createdAt).toLocaleString()}</div>
                 </div>
-                <button
-                  onClick={() => setOpenId(prev => (prev === item._id ? null : item._id))}
-                  className="px-3 py-1 text-sm border border-green-400/50 rounded text-green-300"
-                >
-                  {openId === item._id ? 'Hide' : 'Play'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setOpenId(prev => (prev === item._id ? null : item._id))}
+                    className="px-3 py-1 text-sm border border-green-400/50 rounded text-green-300"
+                  >
+                    {openId === item._id ? 'Hide' : 'Play'}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(item._id, item.title)}
+                    disabled={deletingId === item._id}
+                    className="px-3 py-1 text-sm border border-red-400/50 rounded text-red-300 disabled:opacity-50"
+                  >
+                    {deletingId === item._id ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
               </div>
               {openId === item._id && (
                 <div className="mt-3">
@@ -74,5 +111,3 @@ const RecordingsPage: React.FC<RecordingsPageProps> = ({ onBack }) => {
 };
 
 export default RecordingsPage;
-
-

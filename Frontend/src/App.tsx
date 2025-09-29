@@ -1,15 +1,14 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { FlightMap } from './components/FlightMap';
+import React, { useState, useCallback } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import MapPage from './pages/MapPage';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FlightDetailsPage } from './pages/FlightDetailsPage';
 import { LoginPage } from './pages/LoginPage';
 import RecordingsPage from './pages/RecordingsPage';
-import { SignupPage } from './pages/SignupPage';
 import { useFlights } from './hooks/useFlights';
 import { useAuth } from './contexts/AuthContext';
 import { Flight } from './types/flight';
-import { MapPin, LogIn, UserPlus } from 'lucide-react';
 import AuthService from './services/authService';
 
 function App() {
@@ -19,59 +18,40 @@ function App() {
   } = useFlights();
   
   const { user, isAuthenticated, login, logout, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
-  const [currentView, setCurrentView] = useState<'map' | 'flightDetails' | 'login' | 'signup' | 'recordings'>('map');
   const [pendingFlightClick, setPendingFlightClick] = useState<Flight | null>(null);
-
-
-  // Show all flights without filtering
-  const displayFlights = useMemo(() => {
-    return flights;
-  }, [flights]);
 
   const handleFlightClick = useCallback((flight: Flight) => {
     if (!isAuthenticated) {
       // Store the flight for after authentication
       setPendingFlightClick(flight);
-      // If not authenticated, redirect to signup page
-      setCurrentView('signup');
+      // Redirect to login page
+      navigate('/login');
       return;
     }
     
     // If authenticated, show flight details
     setSelectedFlight(flight);
-    setCurrentView('flightDetails');
     console.log('Flight clicked:', flight.flightNumber);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, navigate]);
 
   const handleBackToMap = useCallback(() => {
     setSelectedFlight(null);
-    setCurrentView('map');
-  }, []);
+    navigate('/');
+  }, [navigate]);
 
   const handleAuthSuccess = useCallback(() => {
     if (pendingFlightClick) {
       // Show the flight details for the pending flight
       setSelectedFlight(pendingFlightClick);
-      setCurrentView('flightDetails');
       setPendingFlightClick(null);
+      navigate('/');
     } else {
-      setCurrentView('map');
+      navigate('/');
     }
-  }, [pendingFlightClick]);
-
-  const handleLoginFromSignup = useCallback(() => {
-    setCurrentView('login');
-  }, []);
-
-  const handleLogin = useCallback(() => {
-    setCurrentView('login');
-  }, []);
-
-  const handleSignup = useCallback(() => {
-    setCurrentView('signup');
-  }, []);
+  }, [pendingFlightClick, navigate]);
 
   const handleLoginSuccess = useCallback(async () => {
     try {
@@ -83,128 +63,86 @@ function App() {
           email: userData.email
         });
       }
-      setCurrentView('map');
+      navigate('/');
     } catch (error) {
       console.error('Login success handler failed:', error);
     }
-  }, [login]);
+  }, [login, navigate]);
 
   const handleLogout = useCallback(async () => {
     try {
       await AuthService.logout();
       logout();
       setSelectedFlight(null);
-      setCurrentView('map');
+      navigate('/login');
     } catch (error) {
       console.error('Logout failed:', error);
     }
-  }, [logout]);
+  }, [logout, navigate]);
+
+  const handleShowRecordings = useCallback(() => {
+    navigate('/recordings');
+  }, [navigate]);
 
   if (loading || authLoading) {
     return <LoadingSpinner />;
   }
 
-  // Show Login Page
-  if (currentView === 'login') {
-    return (
-      <ErrorBoundary>
-        <LoginPage
-          onBack={handleBackToMap}
-          onSignup={handleSignup}
-          onLoginSuccess={handleLoginSuccess}
-          onSuccess={handleAuthSuccess}
-        />
-      </ErrorBoundary>
-    );
-  }
+  // Protected Route Component
+  const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    if (!isAuthenticated) {
+      return <Navigate to="/login" replace />;
+    }
+    return <>{children}</>;
+  };
 
-  // Show Signup Page
-  if (currentView === 'signup') {
-    return (
-      <ErrorBoundary>
-        <SignupPage
-          onBack={handleBackToMap}
-          onLogin={handleLoginFromSignup}
-          onSuccess={handleAuthSuccess}
-        />
-      </ErrorBoundary>
-    );
-  }
-
-  // Show Flight Details Page
-  if (currentView === 'flightDetails' && selectedFlight) {
-    return (
-      <ErrorBoundary>
-        <FlightDetailsPage
-          flight={selectedFlight}
-          onBack={handleBackToMap}
-        />
-      </ErrorBoundary>
-    );
-  }
-
-  if (currentView === 'recordings') {
-    return (
-      <ErrorBoundary>
-        <RecordingsPage onBack={() => setCurrentView('map')} />
-      </ErrorBoundary>
-    );
-  }
-
-  // Show Main Map View
   return (
-    <ErrorBoundary>
-      <div className="h-screen flex flex-col">
-        {/* Header with Midnight Command styling */}
-        <header className="midnight-panel shadow-sm border-b px-4 py-2" 
-                style={{ borderColor: 'rgba(0, 217, 255, 0.3)', backgroundColor: '#0A0E1A' }}>
-          <div className="flex items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center space-x-3">
-              <div className="p-1 rounded-lg midnight-glow" 
-                   style={{ backgroundColor: 'rgba(0, 217, 255, 0.2)' }}>
-                <MapPin className="midnight-text-accent" size={20} />
-              </div>
-              <span className="text-white font-semibold">Flight Tracker</span>
-            </div>
-            
-            {/* User Info - Only show when authenticated */}
-            {isAuthenticated && (
-              <div className="flex items-center gap-3">
-                <span className="text-cyan-400 text-sm">
-                  Welcome, {user?.fullName || 'User'}
-                </span>
-                <button
-                  onClick={() => setCurrentView('recordings')}
-                  className="px-4 py-2 bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/30 transition-all"
-                >
-                  Show Recordings
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-400/30 rounded-lg hover:bg-red-500/30 transition-all"
-                >
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
-        </header>
-
-        {/* Main Map Area - Full Height */}
-        <main style={{ 
-          flex: 1, 
-          height: 'calc(100vh - 60px)', // Account for header only
-          minHeight: '500px',
-          overflow: 'hidden'
-        }}>
-          <FlightMap
-            flights={displayFlights}
-            onFlightClick={handleFlightClick}
+    <Routes>
+      <Route path="/login" element={
+        <ErrorBoundary>
+          <LoginPage
+            onBack={handleBackToMap}
+            onLoginSuccess={handleLoginSuccess}
+            onSuccess={handleAuthSuccess}
           />
-        </main>
-      </div>
-    </ErrorBoundary>
+        </ErrorBoundary>
+      } />
+      <Route path="/" element={
+        <ProtectedRoute>
+          <ErrorBoundary>
+            <MapPage
+              flights={flights}
+              user={user}
+              onFlightClick={handleFlightClick}
+              onShowRecordings={handleShowRecordings}
+              onLogout={handleLogout}
+            />
+          </ErrorBoundary>
+        </ProtectedRoute>
+      } />
+      <Route path="/flights/:flightId" element={
+        <ProtectedRoute>
+          {selectedFlight ? (
+            <ErrorBoundary>
+              <FlightDetailsPage
+                flight={selectedFlight}
+                onBack={handleBackToMap}
+              />
+            </ErrorBoundary>
+          ) : (
+            <Navigate to="/" />
+          )}
+        </ProtectedRoute>
+      } />
+      <Route path="/recordings" element={
+        <ProtectedRoute>
+          <ErrorBoundary>
+            <RecordingsPage onBack={handleBackToMap} />
+          </ErrorBoundary>
+        </ProtectedRoute>
+      } />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 

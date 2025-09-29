@@ -178,6 +178,37 @@ router.get('/:id/stream', AuthMiddleware.authenticate, async (req, res) => {
   }
 });
 
+// Delete a recording by id
+router.delete('/:id', AuthMiddleware.authenticate, async (req, res) => {
+  try {
+    const recording = await Recording.findById(req.params.id);
+    
+    if (!recording) {
+      return res.status(404).json({ success: false, message: 'Recording not found' });
+    }
+    
+    // Check if the user owns this recording
+    if (recording.userId.toString() !== req.userId.toString()) {
+      return res.status(403).json({ success: false, message: 'Forbidden: You do not own this recording' });
+    }
+    
+    // Delete the file from GridFS
+    const bucket = getBucket();
+    try {
+      await bucket.delete(recording.fileId);
+    } catch (deleteErr) {
+      console.error('Error deleting file from GridFS:', deleteErr);
+      // Continue with metadata deletion even if file deletion fails
+    }
+    
+    // Delete the metadata from the database
+    await Recording.findByIdAndDelete(req.params.id);
+    
+    res.json({ success: true, message: 'Recording deleted successfully' });
+  } catch (error) {
+    console.error('Delete recording error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;
-
-

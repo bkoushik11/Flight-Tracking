@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, LayersControl, useMap } from 'react-leaflet';
+import React, { useRef, memo, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, LayersControl, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { Flight } from '../types/flight';
 import { UI_CONFIG } from '../shared/constants';
@@ -57,37 +57,91 @@ const CustomZoomControl: React.FC = () => {
   );
 };
 
+// Mouse Position Tracker Component with throttling
+const MapMouseTracker: React.FC<{ onMouseMove: (lat: number, lng: number) => void }> = ({ onMouseMove }) => {
+  const lastUpdate = useRef(0);
+  const updateThrottle = 150; // Update every 150ms
+
+  useMapEvents({
+    mousemove: (e) => {
+      const now = Date.now();
+      if (now - lastUpdate.current > updateThrottle) {
+        lastUpdate.current = now;
+        onMouseMove(e.latlng.lat, e.latlng.lng);
+      }
+    }
+  });
+  return null;
+};
+
+// Memoized Flight Marker Component
+const FlightMarker = memo(({ flight, onFlightClick }: { flight: Flight; onFlightClick: (flight: Flight) => void }) => {
+  // Validate coordinates
+  const lat = flight.latitude;
+  const lng = flight.longitude;
+  
+  if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+    console.warn('Invalid coordinates for flight:', flight.flightNumber, { lat, lng });
+    return null;
+  }
+
+  // Create icon only when needed
+  const icon = useMemo(() => createAirplaneIcon(flight.heading || 0), [flight.heading]);
+
+  return (
+    <Marker
+      position={[lat, lng]}
+      icon={icon}
+      eventHandlers={{ 
+        click: () => {
+          console.log('Flight marker clicked:', flight.flightNumber);
+          onFlightClick(flight);
+        }
+      }}
+    >
+      <Popup>
+        <div style={{ color: '#000', minWidth: '200px' }}>
+          <h3 style={{ margin: 0, marginBottom: '8px', fontSize: '16px', fontWeight: 'bold' }}>
+            {flight.flightNumber || 'Unknown Flight'}
+          </h3>
+          <p style={{ margin: '4px 0' }}>Altitude: {flight.altitude || 'N/A'} ft</p>
+          <p style={{ margin: '4px 0' }}>Speed: {flight.speed || 'N/A'} kts</p>
+          <p style={{ margin: '4px 0' }}>Status: {flight.status || 'Unknown'}</p>
+          <p style={{ margin: '4px 0' }}>
+            Route: {flight.origin || 'N/A'} → {flight.destination || 'N/A'}
+          </p>
+          <small style={{ margin: '4px 0', display: 'block' }}>
+            Lat: {lat.toFixed(4)}, Lng: {lng.toFixed(4)}
+          </small>
+        </div>
+      </Popup>
+    </Marker>
+  );
+});
+
 /**
  * Props for the FlightMap component
  */
 interface FlightMapProps {
   flights: Flight[];
   onFlightClick?: (flight: Flight) => void;
+  onMouseMove?: (lat: number, lng: number) => void;
   center?: [number, number];
 }
 
 /**
  * Main FlightMap component with proper Leaflet integration
  */
-export const FlightMap: React.FC<FlightMapProps> = ({ 
+export const FlightMap: React.FC<FlightMapProps> = memo(({ 
   flights,
   onFlightClick,
+  onMouseMove,
   center
 }) => {
   const initialCenterRef = useRef<[number, number]>(center || UI_CONFIG.MAP_DEFAULT_CENTER);
 
-  console.log('FlightMap Debug:', {
-    flightsCount: flights.length,
-    center: initialCenterRef.current,
-    hasFlights: flights.length > 0,
-    firstFlight: flights[0] ? {
-      id: flights[0].id,
-      flightNumber: flights[0].flightNumber,
-      lat: flights[0].latitude,
-      lng: flights[0].longitude,
-      heading: flights[0].heading
-    } : null
-  });
+  // Memoize the flights array to prevent unnecessary re-renders
+  const memoizedFlights = useMemo(() => flights, [flights]);
 
   return (
     <div 
@@ -115,11 +169,14 @@ export const FlightMap: React.FC<FlightMapProps> = ({
           console.log('✅ Map container is ready and loaded!');
         }}
       >
+        {/* Mouse Position Tracker */}
+        {onMouseMove && <MapMouseTracker onMouseMove={onMouseMove} />}
+        
         {/* Custom Zoom Controls */}
         <CustomZoomControl />
         
         <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Street Map">
+          <LayersControl.BaseLayer name="Street Map">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -135,7 +192,7 @@ export const FlightMap: React.FC<FlightMapProps> = ({
             />
           </LayersControl.BaseLayer>
           
-          <LayersControl.BaseLayer name="Carto Voyager">
+          <LayersControl.BaseLayer checked name="Carto Voyager">
             <TileLayer
               attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
               url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -153,53 +210,14 @@ export const FlightMap: React.FC<FlightMapProps> = ({
         </LayersControl>
         
         {/* Render flight markers */}
-        {flights.slice(0, 100).map((flight: Flight) => {
-          // Validate coordinates
-          const lat = flight.latitude;
-          const lng = flight.longitude;
-          
-          if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
-            console.warn('Invalid coordinates for flight:', flight.flightNumber, { lat, lng });
-            return null;
-          }
-
-          // Debug heading values
-          if (flight.heading && flight.heading !== 0) {
-            console.log(`Flight ${flight.flightNumber} heading: ${flight.heading}°`);
-          }
-
-          return (
-            <Marker
-              key={flight.id}
-              position={[lat, lng]}
-              icon={createAirplaneIcon(flight.heading || 0)}
-              eventHandlers={{ 
-                click: () => {
-                  console.log('Flight marker clicked:', flight.flightNumber);
-                  onFlightClick?.(flight);
-                }
-              }}
-            >
-              <Popup>
-                <div style={{ color: '#000', minWidth: '200px' }}>
-                  <h3 style={{ margin: 0, marginBottom: '8px', fontSize: '16px', fontWeight: 'bold' }}>
-                    {flight.flightNumber || 'Unknown Flight'}
-                  </h3>
-                  <p style={{ margin: '4px 0' }}>Altitude: {flight.altitude || 'N/A'} ft</p>
-                  <p style={{ margin: '4px 0' }}>Speed: {flight.speed || 'N/A'} kts</p>
-                  <p style={{ margin: '4px 0' }}>Status: {flight.status || 'Unknown'}</p>
-                  <p style={{ margin: '4px 0' }}>
-                    Route: {flight.origin || 'N/A'} → {flight.destination || 'N/A'}
-                  </p>
-                  <small style={{ margin: '4px 0', display: 'block' }}>
-                    Lat: {lat.toFixed(4)}, Lng: {lng.toFixed(4)}
-                  </small>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+        {memoizedFlights.slice(0, 100).map((flight: Flight) => (
+          <FlightMarker 
+            key={flight.id} 
+            flight={flight} 
+            onFlightClick={onFlightClick || (() => {})} 
+          />
+        ))}
       </MapContainer>
     </div>
   );
-};
+});

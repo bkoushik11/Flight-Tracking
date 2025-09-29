@@ -13,6 +13,7 @@ export const useFlights = () => {
   const socketRef = useRef<Socket | null>(null);
   const updateBufferRef = useRef<Flight[] | null>(null);
   const debounceTimerRef = useRef<number | null>(null);
+  const isUpdatingRef = useRef(false);
 
   const fetchFlights = useCallback(async (filters?: {
     minAltitude?: number;
@@ -44,11 +45,52 @@ export const useFlights = () => {
     }
   }, []);
 
-  
-
-
-
-  
+  const applyBufferedUpdate = useCallback(() => {
+    if (!updateBufferRef.current || isUpdatingRef.current) return;
+    
+    isUpdatingRef.current = true;
+    try {
+      const flights = updateBufferRef.current;
+      updateBufferRef.current = null;
+      setFlights(prevFlights => {
+        // Only update if there are actual changes
+        if (flights.length !== prevFlights.length) {
+          return flights.map((f: any) => ({
+            ...f,
+            lastUpdate: new Date((f as any).lastUpdate || Date.now())
+          }));
+        }
+        
+        // Check if any flight data has actually changed
+        const hasChanges = flights.some((flight, index) => {
+          const prevFlight = prevFlights[index];
+          return (
+            flight.latitude !== prevFlight.latitude ||
+            flight.longitude !== prevFlight.longitude ||
+            flight.altitude !== prevFlight.altitude ||
+            flight.speed !== prevFlight.speed ||
+            flight.heading !== prevFlight.heading ||
+            flight.status !== prevFlight.status
+          );
+        });
+        
+        if (hasChanges) {
+          return flights.map((f: any) => ({
+            ...f,
+            lastUpdate: new Date((f as any).lastUpdate || Date.now())
+          }));
+        }
+        
+        // No changes, return previous state to prevent re-render
+        return prevFlights;
+      });
+      setLastUpdate(new Date());
+    } catch (error) {
+      console.error('Error applying flight updates:', error);
+    } finally {
+      isUpdatingRef.current = false;
+    }
+  }, []);
 
   const refreshData = useCallback(async (filters?: {
     minAltitude?: number;
@@ -72,17 +114,6 @@ export const useFlights = () => {
     loadInitialData();
   }, [fetchFlights]);
 
-  // Auto-refresh flights - DISABLED to keep existing flights static
-  // useEffect(() => {
-  //   if (!autoRefresh) return;
-
-  //   const interval = setInterval(() => {
-  //     fetchFlights();
-  //   }, refreshInterval);
-
-  //   return () => clearInterval(interval);
-  // }, [fetchFlights, refreshInterval, autoRefresh]);
-
   // Socket.IO real-time updates with improved connection handling
   useEffect(() => {
     const baseUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
@@ -103,17 +134,6 @@ export const useFlights = () => {
     });
     
     socketRef.current = socket;
-
-    const applyBufferedUpdate = () => {
-      if (!updateBufferRef.current) return;
-      const flights = updateBufferRef.current;
-      updateBufferRef.current = null;
-      setFlights(flights.map((f: any) => ({
-        ...f,
-        lastUpdate: new Date((f as any).lastUpdate || Date.now())
-      })));
-      setLastUpdate(new Date());
-    };
 
     socket.on('connect', () => {
       console.log('✅ Socket connected to backend!');
@@ -181,15 +201,16 @@ export const useFlights = () => {
         
         // Throttle updates to prevent excessive re-renders
         const now = Date.now();
-        if (now - lastUpdateMs > 300) {
+        if (now - lastUpdateMs > 500) { // Increased from 300 to 500ms
           if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
           debounceTimerRef.current = window.setTimeout(() => {
-            lastUpdateMs = Date.now();
+            lastUpdateMs = now;
             applyBufferedUpdate();
-          }, 100);
+          }, 150); // Increased from 100 to 150ms
         }
       } catch (error) {
         // Silent error handling for flight data processing
+        console.error('Error processing flight data:', error);
       }
     });
 
@@ -200,7 +221,7 @@ export const useFlights = () => {
       if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
       socket.disconnect();
     };
-  }, []);
+  }, [applyBufferedUpdate]);
 
   return {
     flights,
