@@ -1,50 +1,9 @@
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useCallback, memo, useRef, useEffect } from 'react';
 import { FlightMap } from '../components/FlightMap';
+import { LeftPanel } from '../components/LeftPanel';
 import { Flight } from '../types/flight';
-
-// Memoized Coordinate Display Component
-const CoordinateDisplay = memo(({ mousePosition }: { mousePosition: { lat: number; lng: number } | null }) => {
-  return (
-    <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-xl px-4 py-2 shadow-lg z-[1000]">
-      <div className="text-cyan-300 text-sm font-mono">
-        {mousePosition 
-          ? `Lat: ${mousePosition.lat.toFixed(6)}, Lng: ${mousePosition.lng.toFixed(6)}` 
-          : 'Move cursor over map to see coordinates'}
-      </div>
-    </div>
-  );
-});
-
-// Memoized User Controls Component
-const UserControls = memo(({ user, onShowRecordings, onLogout }: { 
-  user: any; 
-  onShowRecordings: () => void;
-  onLogout: () => void;
-}) => {
-  return (
-    <div className="absolute bottom-6 right-6 flex flex-col gap-3 z-[1000]">
-      <div className="bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-xl p-3 shadow-lg">
-        <div className="text-cyan-300 text-sm mb-2">
-          Welcome, {user?.fullName || 'User'}
-        </div>
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={onShowRecordings}
-            className="px-4 py-2 bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/30 transition-all text-sm"
-          >
-            Show Recordings
-          </button>
-          <button
-            onClick={onLogout}
-            className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-400/30 rounded-lg hover:bg-red-500/30 transition-all text-sm"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-});
+// import { useNavigate } from 'react-router-dom';
+import { INDIAN_AIRPORTS } from '../components/IndianAirports';
 
 interface MapPageProps {
   flights: Flight[];
@@ -52,16 +11,23 @@ interface MapPageProps {
   onFlightClick: (flight: Flight) => void;
   onShowRecordings: () => void;
   onLogout: () => void;
+  selectedFlight: Flight | null;
+  onBackToMap: () => void;
 }
 
-const MapPage: React.FC<MapPageProps> = memo(({ 
+const MapPageInner: React.FC<MapPageProps> = ({ 
   flights, 
-  user, 
+
   onFlightClick, 
   onShowRecordings, 
-  onLogout 
+  onLogout,
+  selectedFlight,
+  onBackToMap
 }) => {
   const [mousePosition, setMousePosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [notifications, setNotifications] = useState<{id: string, message: string, type: string}[]>([]);
+  const notificationTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  // const navigate = useNavigate();
 
   // Throttle mouse move updates to prevent excessive re-renders
   const handleMapMouseMove = useCallback((lat: number, lng: number) => {
@@ -74,39 +40,151 @@ const MapPage: React.FC<MapPageProps> = memo(({
     });
   }, []);
 
-  // Show all flights without filtering
-  const displayFlights = useMemo(() => {
-    return flights;
-  }, [flights]);
+  // Function to show airport notification for a specific flight
+  const showAirportNotification = useCallback((flight: Flight) => {
+    // Check if flight is near any airport
+    const threshold = 0.01; // Approximately 1km
+    for (const airport of INDIAN_AIRPORTS) {
+      const distance = Math.sqrt(
+        Math.pow(flight.latitude - airport.lat, 2) + 
+        Math.pow(flight.longitude - airport.lng, 2)
+      );
+      
+      if (distance < threshold) {
+        // Flight is near airport
+        const notificationId = `${flight.id}-${airport.name}`;
+        
+        // Check if we already have this notification
+        if (!notifications.some(n => n.id === notificationId)) {
+          let message = `${flight.flightNumber} is at ${airport.name} (${airport.city})`;
+          
+          // Add status-specific information
+          if (flight.status === 'boarding') {
+            message += ' - Boarding passengers';
+          } else if (flight.status === 'delayed') {
+            message += ' - Delayed';
+          } else if (flight.altitude < 1000) {
+            message += ' - Landing';
+          } else if (flight.altitude < 5000 && flight.speed < 200) {
+            message += ' - Approaching';
+          }
+          
+          // Add notification
+          setNotifications(prev => [...prev, {id: notificationId, message, type: flight.status}]);
+          
+          // Remove notification after 5 seconds
+          const timeout = setTimeout(() => {
+            setNotifications(prev => prev.filter(n => n.id !== notificationId));
+            notificationTimeoutsRef.current.delete(notificationId);
+          }, 5000);
+          
+          notificationTimeoutsRef.current.set(notificationId, timeout);
+        }
+        break; // Only show notification for the first nearby airport
+      }
+    }
+  }, [notifications]);
+
+  // Wrapper function for flight click that also shows airport notification
+  const handleFlightClickWithNotification = useCallback((flight: Flight) => {
+    onFlightClick(flight);
+    showAirportNotification(flight);
+  }, [onFlightClick, showAirportNotification]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clear notification timeouts
+      notificationTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+      notificationTimeoutsRef.current.clear();
+    };
+  }, []);
+
+  // Keep the right map container from remounting by stabilizing props/handlers
+  // onFlightClick is memoized from parent; no extra wrapper needed
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Main Map Area - Full Height */}
-      <main style={{ 
-        flex: 1, 
-        height: '100vh',
-        minHeight: '500px',
-        overflow: 'hidden',
-        position: 'relative'
-      }}>
+    <div className="h-screen w-full relative flex flex-col md:flex-row">
+      {/* Left Panel - Only shown when a flight is selected */}
+      {selectedFlight && (
+        <div className="w-full md:w-1/2 h-1/2 md:h-full z-[500]">
+          <LeftPanel 
+            selectedFlight={selectedFlight} 
+            onBackToMap={onBackToMap} 
+          />
+        </div>
+      )}
+      
+      {/* Right Side - Always show the map */}
+      <div className={selectedFlight ? "w-full md:w-1/2 h-1/2 md:h-full relative" : "w-full h-full relative"}>
         <FlightMap
-          flights={displayFlights}
-          onFlightClick={onFlightClick}
+          flights={flights}
+          onFlightClick={handleFlightClickWithNotification}
           onMouseMove={handleMapMouseMove}
+          selectedFlight={selectedFlight}
         />
         
-        {/* Latitude and Longitude Display - Centered at Bottom */}
-        <CoordinateDisplay mousePosition={mousePosition} />
+        {/* Logout Button - Positioned at top right (full screen) or top left (split screen) */}
+        <div className={`absolute ${selectedFlight ? 'top-4 left-4' : 'top-4 right-4'} z-[1000]`}>
+          <button
+            onClick={onLogout}
+            className="px-3 py-2 bg-slate-900/90 backdrop-blur-md border border-red-400/40 rounded-lg flex items-center justify-center gap-2 text-red-400 hover:bg-red-500/20 transition-all shadow-lg text-sm"
+            aria-label="Logout"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
+            </svg>
+            <span className="hidden sm:inline">Logout</span>
+          </button>
+        </div>
         
-        {/* User Controls - Positioned at bottom right */}
-        <UserControls 
-          user={user} 
-          onShowRecordings={onShowRecordings}
-          onLogout={onLogout}
-        />
-      </main>
+        {/* Latitude and Longitude Display - Positioned at bottom center of map area */}
+        {mousePosition && (
+          <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-xl px-4 py-2 shadow-lg z-[1000]">
+            <div className="text-cyan-300 text-sm font-mono">
+              {`Lat: ${mousePosition.lat.toFixed(6)}, Lng: ${mousePosition.lng.toFixed(6)}`}
+            </div>
+          </div>
+        )}
+        
+        {/* Airport Notifications */}
+        <div className="absolute top-4 right-16 flex flex-col gap-2 z-[1000]">
+          {notifications.map(notification => (
+            <div 
+              key={notification.id}
+              className="bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg animate-fadeIn max-w-xs sm:max-w-sm"
+            >
+              <div className="flex items-center">
+                <span className="mr-2">✈️</span>
+                <span className="text-sm">{notification.message}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* User Controls - Positioned at top left (full screen) or top right (split screen) */}
+      <div className={`absolute ${selectedFlight ? 'top-4 right-4' : 'top-4 left-4'} z-[1000]`}>
+        <div className="bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-lg p-2 shadow-lg">
+          <button
+            onClick={onShowRecordings}
+            className="px-3 py-1.5 bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/30 transition-all text-xs"
+          >
+            <span className="hidden sm:inline">Show Recordings</span> <span className="sm:hidden">Recordings</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
-});
+};
 
-export default MapPage;
+// Memoize the MapPage to prevent unnecessary re-renders
+export default memo(MapPageInner, (prevProps, nextProps) => {
+  // Only re-render if essential props have changed
+  // Use a more lenient comparison to prevent unnecessary re-renders
+  return (
+    prevProps.flights === nextProps.flights &&
+    prevProps.selectedFlight === nextProps.selectedFlight &&
+    prevProps.user === nextProps.user
+  );
+});

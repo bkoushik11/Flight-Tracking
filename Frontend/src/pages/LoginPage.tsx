@@ -63,13 +63,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onLoginSuccess, on
         });
       }
       
-      // If there's a success callback (from flight click), use it
-      // Otherwise, use the default login success handler
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        onLoginSuccess();
-      }
+      // Always call the login success handler to ensure navigation to homepage
+      onLoginSuccess();
     } catch (error: any) {
       console.error('Login failed:', error);
       
@@ -94,23 +89,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onLoginSuccess, on
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-slate-900 to-gray-950 relative overflow-hidden flex">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-slate-900 to-gray-950 relative overflow-hidden flex flex-col md:flex-row">
       {/* Left Side - Logo */}
-      <div className="w-1/2 flex items-center justify-center">
+      <div className="w-full md:w-1/2 flex items-center justify-center p-6">
         <img 
           src="/WhatsApp Image 2025-09-25 at 12.25.57_dfd8943f.jpg" 
           alt="Situational Awareness Suit Logo" 
-          className="h-80 w-auto rounded-lg shadow-lg"
+          className="h-44 md:h-80 w-auto rounded-lg shadow-lg"
         />
       </div>
 
-      {/* Thin transparent line separator */}
-      <div className="absolute left-1/2 top-0 bottom-0 flex items-center justify-center">
+      {/* Thin transparent line separator - hidden on mobile */}
+      <div className="hidden md:absolute md:left-1/2 md:top-0 md:bottom-0 md:flex md:items-center md:justify-center">
         <div className="h-4/5 w-px bg-gradient-to-b from-transparent via-cyan-400/30 to-transparent"></div>
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="w-1/2 relative">
+      <div className="w-full md:w-1/2 relative">
         {/* Animated Background */}
         <div className="fixed inset-0 opacity-20">
           <div 
@@ -129,19 +124,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onLoginSuccess, on
         <div className="relative z-10 flex items-center justify-center min-h-screen p-6">
           <div className="w-full max-w-md mx-auto">
             {/* Header */}
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-3 mb-6 px-6 py-3 rounded-2xl bg-slate-900/60 border border-cyan-400/30 backdrop-blur-md">
-                <Plane className="w-8 h-8 text-cyan-400" />
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-green-400 bg-clip-text text-transparent">
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center gap-4 mb-7 px-5 py-3 rounded-2xl bg-slate-900/60 border border-cyan-400/30 backdrop-blur-md">
+                <Plane className="w-7 h-7 md:w-8 md:h-8 flight-primary" />
+                <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-cyan-400 to-green-400 bg-clip-text text-transparent">
                   Situational Awareness Suit
                 </h1>
               </div>
-              <h2 className="text-3xl font-bold text-white mb-2">Welcome Back</h2>
-              <p className="text-slate-400">Sign in to your account</p>
+              <h2 className="text-2xl md:text-3xl font-bold midnight-text-primary mb-3">Welcome Back</h2>
+              <p className="text-slate-400 text-sm md:text-base">Sign in to your account</p>
             </div>
 
             {/* Login Form */}
-            <div className="bg-slate-900/40 backdrop-blur-xl border border-cyan-400/20 rounded-2xl p-8">
+            <div className="flight-secondary-bg backdrop-blur-xl flight-panel-border rounded-2xl p-7 md:p-8">
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Email */}
                 <div>
@@ -161,7 +156,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onLoginSuccess, on
                     />
                   </div>
                   {errors.email && (
-                    <p className="mt-1 text-sm text-red-400">{errors.email}</p>
+                    <p className="mt-2 text-sm flight-danger">{errors.email}</p>
                   )}
                 </div>
 
@@ -190,7 +185,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onLoginSuccess, on
                     </button>
                   </div>
                   {errors.password && (
-                    <p className="mt-1 text-sm text-red-400">{errors.password}</p>
+                    <p className="mt-2 text-sm flight-danger">{errors.password}</p>
                   )}
                 </div>
 
@@ -205,7 +200,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBack, onLoginSuccess, on
               </form>
 
               {/* Info Text */}
-              <div className="mt-6 text-center">
+              <div className="mt-8 text-center">
                 <p className="text-slate-400 text-sm">
                   Contact administrator for account access
                 </p>

@@ -42,7 +42,7 @@ export class FlightService {
 
       // Map backend -> frontend flight shape
       const flights: Flight[] = rawFlights.map((f) => {
-        const status = String(f.status || 'on-time').replace(' ', '-');
+        const status = String(f.status || 'on-time');
         const path = Array.isArray(f.history)
           ? f.history.map((h: any) => [Number(h.lat), Number(h.lng)] as [number, number])
           : [];

@@ -61,7 +61,7 @@ module.exports = {
   SOCKET_EVENTS,
   CONFIG: {
     PORT: Number(process.env.PORT) || 5000,
-    TICK_MS: Number(process.env.TICK_MS) || 10000, // Set to 10 seconds to match frontend expectation
+    TICK_MS: Number(process.env.TICK_MS) || 30000, // Changed to 30 seconds to reduce refresh frequency
     CORS_ORIGIN: process.env.CORS_ORIGIN || "*",
     FLIGHT_COUNT: Number(process.env.FLIGHT_COUNT) || 200
   }

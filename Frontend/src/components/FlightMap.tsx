@@ -1,223 +1,221 @@
-import React, { useRef, memo, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, LayersControl, useMap, useMapEvents } from 'react-leaflet';
+import React, { useEffect, useRef, useMemo, memo, useState } from 'react';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Flight } from '../types/flight';
-import { UI_CONFIG } from '../shared/constants';
-import { Plus, Minus } from 'lucide-react';
-import 'leaflet/dist/leaflet.css';
+import IndianAirports, { INDIAN_AIRPORTS } from './IndianAirports';
+import { MapZoomControls } from './MapZoomControls';
 
-// Create dynamic airplane icon based on heading
-const createAirplaneIcon = (heading: number): L.Icon => {
-  return new L.Icon({
-    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 32 32" fill="#10b981" width="32" height="32">
-        <g transform="rotate(${heading} 12 12)">
-          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-        </g>
-      </svg>
-    `),
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16],
-    shadowUrl: undefined,
-    shadowSize: undefined,
-    shadowAnchor: undefined
-  });
-};
+// Fix for default marker icons in React-Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
-// Custom Zoom Control Component
-const CustomZoomControl: React.FC = () => {
-  const map = useMap();
+interface FlightMapProps {
+  flights: Flight[];
+  onFlightClick: (flight: Flight) => void;
+  onMouseMove?: (lat: number, lng: number) => void;
+  selectedFlight: Flight | null;
+}
 
-  const handleZoomIn = () => {
-    map.zoomIn();
-  };
-
-  const handleZoomOut = () => {
-    map.zoomOut();
-  };
-
-  return (
-    <div className="absolute top-20 right-4 z-[1000] flex flex-col gap-1">
-      <button 
-        onClick={handleZoomIn}
-        className="w-10 h-10 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 hover:shadow-lg active:scale-95"
-        title="Zoom In"
-      >
-        <Plus className="w-5 h-5 text-gray-700" />
-      </button>
-      <button 
-        onClick={handleZoomOut}
-        className="w-10 h-10 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 hover:shadow-lg active:scale-95"
-        title="Zoom Out"
-      >
-        <Minus className="w-5 h-5 text-gray-700" />
-      </button>
-    </div>
-  );
-};
-
-// Mouse Position Tracker Component with throttling
-const MapMouseTracker: React.FC<{ onMouseMove: (lat: number, lng: number) => void }> = ({ onMouseMove }) => {
-  const lastUpdate = useRef(0);
-  const updateThrottle = 150; // Update every 150ms
-
+// Component to handle map events
+const MapEvents: React.FC<{ onMouseMove?: (lat: number, lng: number) => void }> = ({ onMouseMove }) => {
   useMapEvents({
     mousemove: (e) => {
-      const now = Date.now();
-      if (now - lastUpdate.current > updateThrottle) {
-        lastUpdate.current = now;
-        onMouseMove(e.latlng.lat, e.latlng.lng);
-      }
-    }
+      onMouseMove?.(e.latlng.lat, e.latlng.lng);
+    },
   });
   return null;
 };
 
-// Memoized Flight Marker Component
-const FlightMarker = memo(({ flight, onFlightClick }: { flight: Flight; onFlightClick: (flight: Flight) => void }) => {
-  // Validate coordinates
-  const lat = flight.latitude;
-  const lng = flight.longitude;
-  
-  if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
-    console.warn('Invalid coordinates for flight:', flight.flightNumber, { lat, lng });
-    return null;
+// Component to persist map view - only fit bounds once on first load
+const PersistView: React.FC = () => {
+  const map = useMap();
+  const hasFittedOnce = useRef(false);
+
+  useEffect(() => {
+    // Only set the initial view once
+    if (!hasFittedOnce.current) {
+      try {
+        // Set initial view to India
+        map.setView([20.5937, 78.9629], 5);
+        hasFittedOnce.current = true;
+      } catch (error) {
+        console.warn('Could not set initial view:', error);
+      }
+    }
+  }, []); // Remove dependencies to ensure this only runs once
+
+  return null;
+};
+
+// Create airplane icon using Unicode symbol (without background)
+const createAirplaneIcon = (heading: number) => {
+  return L.divIcon({
+    className: 'custom-airplane-icon',
+    html: `
+      <div style="
+        width: 24px; 
+        height: 24px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        transform: rotate(${heading}deg);
+      ">
+        <div style="
+          font-size: 24px;
+          color: #06b6d4;
+          font-weight: bold;
+          text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        ">✈</div>
+      </div>
+    `,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+};
+
+// Check if flight is near an airport
+const isFlightNearAirport = (flight: Flight) => {
+  const threshold = 0.01; // Approximately 1km
+  for (const airport of INDIAN_AIRPORTS) {
+    const distance = Math.sqrt(
+      Math.pow(flight.latitude - airport.lat, 2) + 
+      Math.pow(flight.longitude - airport.lng, 2)
+    );
+    if (distance < threshold) {
+      return { isNear: true, airport };
+    }
   }
+  return { isNear: false, airport: null };
+};
 
-  // Create icon only when needed
-  const icon = useMemo(() => createAirplaneIcon(flight.heading || 0), [flight.heading]);
-
+// Individual Flight Marker Component - memoized to prevent re-renders
+const FlightMarker = memo(({ flight, onClick }: { flight: Flight; onClick: (flight: Flight) => void }) => {
+  if (!flight.latitude || !flight.longitude) return null;
+  
+  const { isNear, airport } = isFlightNearAirport(flight);
+  
   return (
-    <Marker
-      position={[lat, lng]}
-      icon={icon}
-      eventHandlers={{ 
-        click: () => {
-          console.log('Flight marker clicked:', flight.flightNumber);
-          onFlightClick(flight);
-        }
-      }}
-    >
-      <Popup>
-        <div style={{ color: '#000', minWidth: '200px' }}>
-          <h3 style={{ margin: 0, marginBottom: '8px', fontSize: '16px', fontWeight: 'bold' }}>
-            {flight.flightNumber || 'Unknown Flight'}
-          </h3>
-          <p style={{ margin: '4px 0' }}>Altitude: {flight.altitude || 'N/A'} ft</p>
-          <p style={{ margin: '4px 0' }}>Speed: {flight.speed || 'N/A'} kts</p>
-          <p style={{ margin: '4px 0' }}>Status: {flight.status || 'Unknown'}</p>
-          <p style={{ margin: '4px 0' }}>
-            Route: {flight.origin || 'N/A'} → {flight.destination || 'N/A'}
-          </p>
-          <small style={{ margin: '4px 0', display: 'block' }}>
-            Lat: {lat.toFixed(4)}, Lng: {lng.toFixed(4)}
-          </small>
-        </div>
-      </Popup>
-    </Marker>
+    <>
+      <Marker
+        position={[flight.latitude, flight.longitude]}
+        icon={createAirplaneIcon(flight.heading || 0)}
+        eventHandlers={{
+          click: () => onClick(flight),
+        }}
+      >
+        {isNear && flight.status === 'boarding' && (
+          <Popup>
+            <div className="text-sm">
+              <div className="font-bold text-blue-600">{flight.flightNumber}</div>
+              <div>At {airport?.name} ({airport?.city})</div>
+              <div className="text-green-600">Boarding passengers</div>
+            </div>
+          </Popup>
+        )}
+      </Marker>
+    </>
+  );
+}, (prevProps, nextProps) => {
+  // Only re-render if the flight data or onClick handler has changed
+  // Use deep comparison for flight data with tolerance for position changes
+  const prevFlight = prevProps.flight;
+  const nextFlight = nextProps.flight;
+  
+  // If it's the same object reference, no need to re-render
+  if (prevFlight === nextFlight) return true;
+  
+  // Always re-render if position has changed significantly
+  const hasSignificantPositionChange = 
+    Math.abs(prevFlight.latitude - nextFlight.latitude) > 0.0001 ||
+    Math.abs(prevFlight.longitude - nextFlight.longitude) > 0.0001;
+    
+  // If position changed significantly, we must re-render
+  if (hasSignificantPositionChange) {
+    return false; // Allow re-render
+  }
+  
+  // For other changes, check if they're significant
+  const hasSignificantOtherChange = 
+    prevFlight.id !== nextFlight.id ||
+    Math.abs(prevFlight.altitude - nextFlight.altitude) > 10 ||
+    Math.abs(prevFlight.speed - nextFlight.speed) > 5 ||
+    Math.abs(prevFlight.heading - nextFlight.heading) > 2 ||
+    prevFlight.status !== nextFlight.status ||
+    prevFlight.flightNumber !== nextFlight.flightNumber;
+  
+  // Re-render only if there are significant changes
+  return !hasSignificantOtherChange;
+});
+
+// Separate component for flight markers to allow independent updates
+const FlightMarkers: React.FC<{ 
+  flights: Flight[]; 
+  onFlightClick: (flight: Flight) => void;
+}> = memo(({ flights, onFlightClick }) => {
+  const markers = useMemo(() => {
+    return flights.map(flight => (
+      <FlightMarker 
+        key={flight.id} 
+        flight={flight} 
+        onClick={onFlightClick} 
+      />
+    ));
+  }, [flights, onFlightClick]);
+
+  return <>{markers}</>;
+}, (prevProps, nextProps) => {
+  // Only re-render if flights array or onFlightClick handler has changed
+  // Use reference equality check for better performance
+  return (
+    prevProps.flights === nextProps.flights &&
+    prevProps.onFlightClick === nextProps.onFlightClick
   );
 });
 
-/**
- * Props for the FlightMap component
- */
-interface FlightMapProps {
-  flights: Flight[];
-  onFlightClick?: (flight: Flight) => void;
-  onMouseMove?: (lat: number, lng: number) => void;
-  center?: [number, number];
-}
-
-/**
- * Main FlightMap component with proper Leaflet integration
- */
-export const FlightMap: React.FC<FlightMapProps> = memo(({ 
-  flights,
-  onFlightClick,
+// Main FlightMap component - memoized to prevent re-renders
+const FlightMapInner: React.FC<FlightMapProps> = ({ 
+  flights, 
+  onFlightClick, 
   onMouseMove,
-  center
+  selectedFlight 
 }) => {
-  const initialCenterRef = useRef<[number, number]>(center || UI_CONFIG.MAP_DEFAULT_CENTER);
-
-  // Memoize the flights array to prevent unnecessary re-renders
-  const memoizedFlights = useMemo(() => flights, [flights]);
-
   return (
-    <div 
-      id="map-container"
-      style={{ 
-        height: '100%', 
-        width: '100%',
-        position: 'relative',
-        minHeight: '400px'
-      }}
+    <MapContainer 
+      style={{ height: '100%', width: '100%', zIndex: 1 }}
+      zoomControl={false}
+      // Add performance optimizations
+      preferCanvas={true}
+      attributionControl={false}
+      className="z-10"
     >
-      <MapContainer
-        center={initialCenterRef.current}
-        zoom={UI_CONFIG.MAP_DEFAULT_ZOOM}
-        style={{ 
-          height: '100%', 
-          width: '100%',
-          minHeight: '400px'
-        }}
-        zoomControl={false} // We'll add custom controls
-        attributionControl={true}
-        scrollWheelZoom={true}
-        doubleClickZoom={true}
-        whenReady={() => {
-          console.log('✅ Map container is ready and loaded!');
-        }}
-      >
-        {/* Mouse Position Tracker */}
-        {onMouseMove && <MapMouseTracker onMouseMove={onMouseMove} />}
-        
-        {/* Custom Zoom Controls */}
-        <CustomZoomControl />
-        
-        <LayersControl position="topright">
-          <LayersControl.BaseLayer name="Street Map">
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maxZoom={19}
-            />
-          </LayersControl.BaseLayer>
-          
-          <LayersControl.BaseLayer name="Satellite">
-            <TileLayer
-              attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              maxZoom={18}
-            />
-          </LayersControl.BaseLayer>
-          
-          <LayersControl.BaseLayer checked name="Carto Voyager">
-            <TileLayer
-              attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              maxZoom={19}
-            />
-          </LayersControl.BaseLayer>
-          
-          <LayersControl.BaseLayer name="Terrain">
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
-              maxZoom={17}
-            />
-          </LayersControl.BaseLayer>
-        </LayersControl>
-        
-        {/* Render flight markers */}
-        {memoizedFlights.slice(0, 100).map((flight: Flight) => (
-          <FlightMarker 
-            key={flight.id} 
-            flight={flight} 
-            onFlightClick={onFlightClick || (() => {})} 
-          />
-        ))}
-      </MapContainer>
-    </div>
+      <PersistView />
+      <MapEvents onMouseMove={onMouseMove} />
+      <MapZoomControls />
+      <TileLayer
+        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        // Add performance optimizations
+        keepBuffer={2}
+      />
+      <IndianAirports />
+      <FlightMarkers flights={flights} onFlightClick={onFlightClick} />
+    </MapContainer>
+  );
+};
+
+// Memoize the entire FlightMap to prevent re-renders when props haven't changed significantly
+export const FlightMap = memo(FlightMapInner, (prevProps, nextProps) => {
+  // Only re-render if essential props have changed
+  // We don't need to re-render for selectedFlight changes as that doesn't affect the map container
+  // Use reference equality for flights array to prevent re-rendering when individual flight objects change
+  return (
+    prevProps.flights === nextProps.flights &&
+    prevProps.onFlightClick === nextProps.onFlightClick &&
+    prevProps.onMouseMove === nextProps.onMouseMove
   );
 });

@@ -2,11 +2,11 @@ const axios = require('axios');
 const { GEOGRAPHIC_BOUNDS } = require("../../utils/constants");
 
 // OpenSky API configuration based on official documentation
-const OPENSKY_API_BASE = 'https://opensky-network.org/api';
+const OPENSKY_API_BASE = 'https://opensky-network.org/api/states/all';
 const OPENSKY_AUTH_BASE = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
 const API_TIMEOUT = 15000; // 15 seconds
-const CACHE_DURATION = 10000; // Set to 10 seconds to match update interval
-const MIN_REQUEST_INTERVAL = 10000; // Set to 10 seconds to match update interval
+const CACHE_DURATION = 15000; // 15 seconds cache duration to match update interval
+const MIN_REQUEST_INTERVAL = 15000; // 15 seconds minimum request interval
 
 // India geographic boundaries
 const INDIA_BOUNDS = {
@@ -34,8 +34,8 @@ class FlightService {
     
     // Validate OpenSky API credentials
     if (!process.env.CLIENT_ID || !process.env.CLIENT_SECRET) {
-      console.warn('⚠️  OpenSky API credentials not found in .env file');
-      console.warn('   Using anonymous access (400 requests/day, 10s intervals)');
+      console.log('⚠️  OpenSky API credentials not found in .env file');
+      console.log('   Using anonymous access (400 requests/day, 10s intervals)');
     } else {
       console.log('✅ OpenSky API credentials configured for OAuth2');
       console.log(`   Client ID: ${process.env.CLIENT_ID}`);
@@ -49,17 +49,18 @@ class FlightService {
   }
 
   async _getAccessToken() {
+    // Require CLIENT_ID and CLIENT_SECRET for OAuth2
+    if (!process.env.CLIENT_ID || !process.env.CLIENT_SECRET) {
+      return null; // No credentials, return null to indicate anonymous access
+    }
+
+    // Check if we have a valid token
+    if (this.accessToken && Date.now() < this.tokenExpiry) {
+      return this.accessToken;
+    }
+
     try {
-      // Check if we have a valid token
-      if (this.accessToken && Date.now() < this.tokenExpiry) {
-        return this.accessToken;
-      }
-      
-      if (!process.env.CLIENT_ID || !process.env.CLIENT_SECRET) {
-        return null; // No credentials, use anonymous access
-      }
-      
-      console.log('Obtaining OAuth2 access token...');
+      console.log('🔐 Obtaining OAuth2 access token...');
       
       const response = await axios.post(OPENSKY_AUTH_BASE, new URLSearchParams({
         grant_type: 'client_credentials',
@@ -71,30 +72,20 @@ class FlightService {
           'Content-Type': 'application/x-www-form-urlencoded'
         }
       });
-      
-      if (response.data && response.data.access_token) {
-        this.accessToken = response.data.access_token;
-        // Token expires in 30 minutes according to docs, set expiry 5 minutes earlier
-        this.tokenExpiry = Date.now() + (25 * 60 * 1000);
-        console.log('✅ OAuth2 token obtained successfully');
-        return this.accessToken;
-      } else {
-        throw new Error('Invalid token response');
+
+      if (!response.data?.access_token) {
+        console.warn('⚠️  Failed to obtain OpenSky OAuth2 token. Falling back to anonymous access.');
+        return null;
       }
-      
+
+      this.accessToken = response.data.access_token;
+      // Token expires in 30 minutes according to docs, set expiry 5 minutes earlier
+      this.tokenExpiry = Date.now() + (25 * 60 * 1000);
+      console.log('✅ OAuth2 token obtained successfully');
+      return this.accessToken;
     } catch (error) {
-      console.error('OAuth2 token error:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
-      
-      // Clear invalid token
-      this.accessToken = null;
-      this.tokenExpiry = 0;
-      
-      return null; // Fall back to anonymous access
+      console.warn('⚠️  Error obtaining OAuth2 token. Falling back to anonymous access:', error.message);
+      return null;
     }
   }
 
@@ -102,10 +93,8 @@ class FlightService {
     try {
       const currentTime = Date.now();
       
-      // Enforce minimum request interval to prevent rate limiting
-      const timeSinceLastRequest = currentTime - this.lastFetchTime;
-      if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-        console.log(`Rate limiting: Using cached data. Next request in ${Math.ceil((MIN_REQUEST_INTERVAL - timeSinceLastRequest) / 1000)}s`);
+      // Always check cache first - return cached data if the last request was too recent
+      if (currentTime - this.lastFetchTime < MIN_REQUEST_INTERVAL) {
         if (this.flightCache.size > 0) {
           return Array.from(this.flightCache.values());
         }
@@ -114,16 +103,15 @@ class FlightService {
       
       // Check if we're in rate limit backoff period
       if (this.rateLimitBackoff > currentTime) {
-        console.log(`Rate limit backoff active until ${new Date(this.rateLimitBackoff).toLocaleTimeString()}`);
+        // Always return cached data during backoff period if available
         if (this.flightCache.size > 0) {
           return Array.from(this.flightCache.values());
         }
         return [];
       }
       
-      // Use cache if data is recent
+      // Use cache if data is recent (but not too recent as checked above)
       if (currentTime - this.lastFetchTime < this.cacheDuration && this.flightCache.size > 0) {
-        console.log(`Using cached flight data (${this.flightCache.size} flights)`);
         return Array.from(this.flightCache.values());
       }
 
@@ -140,8 +128,8 @@ class FlightService {
         }
         const arr = this.flightHistories.get(id);
         arr.push(position);
-        if (arr.length > 50) {
-          arr.splice(0, arr.length - 50);
+        if (arr.length > 500) {
+          arr.splice(0, arr.length - 500);
         }
         // attach copy of history to response object
         f.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
@@ -150,32 +138,31 @@ class FlightService {
       // Reset rate limit backoff on successful request
       this.rateLimitBackoff = 0;
       
-      if (flights.length === 0) {
-        console.warn('No flights returned from OpenSky API');
-      }
-      
       // Update cache
       this.flightCache.clear();
       flights.forEach(flight => this.flightCache.set(flight.id, flight));
       this.lastFetchTime = currentTime;
       
       this._updateStats(currentTime);
-      console.log(`✅ Fetched and processed ${flights.length} flights from OpenSky API`);
+      if (flights.length > 0) {
+        console.log(`✅ Fetched and processed ${flights.length} flights from OpenSky API`);
+      }
       return flights;
       
     } catch (error) {
-      console.error("Error in getAllFlights:", error.message);
+      console.error("💥 Error in getAllFlights:", error.message);
       
       // Handle rate limiting with exponential backoff
-      if (error.message.includes('rate limit')) {
-        // Set backoff to 10 minutes for rate limiting
-        this.rateLimitBackoff = Date.now() + (10 * 60 * 1000);
-        console.log(`Rate limited. Backing off for 10 minutes until ${new Date(this.rateLimitBackoff).toLocaleTimeString()}`);
+      if (error.message.includes('rate limit') || error.response?.status === 429) {
+        const currentTime = Date.now();
+        
+        // Set initial backoff to 5 minutes
+        this.rateLimitBackoff = currentTime + (5 * 60 * 1000);
+        console.log(`⏰ Rate limited. Backing off for 5 minutes until ${new Date(this.rateLimitBackoff).toLocaleTimeString()}`);
       }
       
-      // Return cached data if available during errors
+      // Return cached data if available during errors, even if it's stale
       if (this.flightCache.size > 0) {
-        console.log('Returning cached data due to API error');
         return Array.from(this.flightCache.values());
       }
       
@@ -185,73 +172,89 @@ class FlightService {
   }
 
   async _fetchFromOpenSkyAPI() {
+    let url;
+    let config = { timeout: API_TIMEOUT };
+
+    // India bounding box params
+    const params = new URLSearchParams({
+      lamin: INDIA_BOUNDS.lamin.toString(),
+      lomin: INDIA_BOUNDS.lomin.toString(),
+      lamax: INDIA_BOUNDS.lamax.toString(),
+      lomax: INDIA_BOUNDS.lomax.toString()
+    });
+
     try {
-      // OpenSky API endpoint with India bounding box parameters
-      const params = new URLSearchParams({
-        lamin: INDIA_BOUNDS.lamin.toString(),
-        lomin: INDIA_BOUNDS.lomin.toString(),
-        lamax: INDIA_BOUNDS.lamax.toString(),
-        lomax: INDIA_BOUNDS.lomax.toString()
-      });
-      
-      const url = `${OPENSKY_API_BASE}/states/all?${params.toString()}`;
-      
-      // Prepare configuration
-      const config = {
-        timeout: API_TIMEOUT,
-        headers: {
-          'User-Agent': 'Flight-Tracker-App/1.0'
-        }
-      };
-      
       // Try to get OAuth2 token
       const token = await this._getAccessToken();
       
       if (token) {
-        // Use OAuth2 Bearer token authentication
-        config.headers['Authorization'] = `Bearer ${token}`;
-        console.log('Making authenticated request to OpenSky API for India flights...');
+        // Use OAuth2 if credentials exist and token was obtained
+        url = `${OPENSKY_API_BASE}?${params.toString()}`;
+        config.headers = {
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': 'Flight-Tracker-App/1.0'
+        };
+        console.log('📡 Making authenticated request to OpenSky API...');
       } else {
-        console.log('Making anonymous request to OpenSky API for India flights...');
+        // Anonymous fallback
+        url = `${OPENSKY_API_BASE}?${params.toString()}`;
+        config.headers = {
+          'User-Agent': 'Flight-Tracker-App/1.0'
+        };
+        console.log('📡 Making anonymous request to OpenSky API...');
       }
-      
+
       const response = await axios.get(url, config);
-      
-      if (!response.data || !response.data.states) {
-        throw new Error('Invalid response format from OpenSky API');
+
+      if (!response.data?.states) {
+        throw new Error('Invalid response from OpenSky API.');
       }
+
+      // Transform to internal flight format and limit
+      const flights = this._transformOpenSkyData(response.data.states).slice(0, 100);
       
-      const states = response.data.states;
-      console.log(`Received ${states.length} aircraft from India region`);
-      
-      // Transform OpenSky data to our flight format and limit to 100 flights
-      const flights = this._transformOpenSkyData(states).slice(0, 100);
-      
-      console.log(`Processed ${flights.length} valid flights (limited to 100)`);
       return flights;
-      
+
     } catch (error) {
-      console.error('OpenSky API Error Details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
+      console.error("💥 Error fetching from OpenSky API:", error.message);
       
-      if (error.code === 'ECONNABORTED') {
-        throw new Error('OpenSky API request timeout');
-      } else if (error.response?.status === 429) {
-        throw new Error('OpenSky API rate limit exceeded - please wait before retrying');
-      } else if (error.response?.status === 401) {
-        throw new Error('OpenSky API authentication failed - using anonymous access');
-      } else {
-        throw new Error(`OpenSky API error: ${error.message}`);
+      // Log additional details for debugging
+      if (error.response) {
+        console.error("   Status:", error.response.status);
+        console.error("   Status Text:", error.response.statusText);
+        console.error("   Headers:", JSON.stringify(error.response.headers, null, 2));
       }
+
+      // If OAuth2 fails with rate limiting, fallback to anonymous API
+      if (error.response?.status === 429 || error.message.includes('rate limit')) {
+        console.warn("⚠️ Rate limited. Trying anonymous access...");
+
+        url = `${OPENSKY_API_BASE}?${params.toString()}`;
+        const fallbackResponse = await axios.get(url, { 
+          timeout: API_TIMEOUT,
+          headers: {
+            'User-Agent': 'Flight-Tracker-App/1.0'
+          }
+        });
+        
+        if (!fallbackResponse.data?.states) throw new Error("Fallback also failed");
+
+        const flights = this._transformOpenSkyData(fallbackResponse.data.states).slice(0, 100);
+        console.log(`✅ Fallback: Processed ${flights.length} flights using anonymous mode`);
+        return flights;
+      }
+
+      throw error;
     }
   }
   
   _transformOpenSkyData(states) {
     const validFlights = [];
+    
+    if (!Array.isArray(states)) {
+      console.warn('⚠️  Invalid states data received from OpenSky API');
+      return validFlights;
+    }
     
     states.forEach((state, index) => {
       try {
@@ -324,7 +327,7 @@ class FlightService {
         
       } catch (error) {
         // Skip invalid entries silently
-        console.warn(`Skipping invalid flight data at index ${index}:`, error.message);
+        console.warn(`⚠️  Skipping invalid flight data at index ${index}:`, error.message);
       }
     });
     
@@ -337,22 +340,17 @@ class FlightService {
     }
     
     try {
-      console.log(`🔍 Looking for flight ${id} in cache...`);
       // Check cache first
       if (this.flightCache.has(id)) {
-        const cachedFlight = this.flightCache.get(id);
-        console.log(`✅ Found flight ${id} in cache`);
-        return cachedFlight;
+        return this.flightCache.get(id);
       }
       
-      console.log(`🔄 Flight ${id} not in cache, fetching fresh data...`);
       // Always fetch fresh data for individual flight requests if not in cache
       const flights = await this.getAllFlights();
       const flight = flights.find(flight => flight.id === id) || null;
       
       // Update the flight history
       if (flight) {
-        console.log(`✅ Found flight ${id} in fresh data`);
         const nowTs = Date.now();
         const position = { lat: flight.lat, lng: flight.lng, alt: flight.altitude, ts: nowTs };
         if (!this.flightHistories.has(id)) {
@@ -360,18 +358,16 @@ class FlightService {
         }
         const arr = this.flightHistories.get(id);
         arr.push(position);
-        if (arr.length > 50) {
-          arr.splice(0, arr.length - 50);
+        if (arr.length > 500) {
+          arr.splice(0, arr.length - 500);
         }
         // attach copy of history to response object
         flight.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
-      } else {
-        console.log(`⚠️ Flight ${id} not found in fresh data`);
       }
       
       return flight;
     } catch (error) {
-      console.error(`Error getting flight ${id}:`, error);
+      console.error(`💥 Error getting flight ${id}:`, error);
       return null;
     }
   }
@@ -382,7 +378,7 @@ class FlightService {
 
   async resetFlights() {
     try {
-      console.log("Clearing flight cache and forcing fresh OpenSky API fetch");
+      console.log("🔄 Clearing flight cache and forcing fresh OpenSky API fetch");
       this.flightCache.clear();
       this.lastFetchTime = 0;
       this.rateLimitBackoff = 0;
@@ -390,9 +386,24 @@ class FlightService {
       this.tokenExpiry = 0;
       return await this.getAllFlights();
     } catch (error) {
-      console.error("Error resetting flights:", error);
+      console.error("💥 Error resetting flights:", error);
       throw error;
     }
+  }
+
+  // Add a method to manually clear rate limit backoff
+  clearRateLimitBackoff() {
+    console.log("🔄 Manually clearing rate limit backoff");
+    this.rateLimitBackoff = 0;
+  }
+
+  // Add a method to force refresh flights
+  async forceRefreshFlights() {
+    console.log("🔄 Force refreshing flights - clearing cache and backoff");
+    this.flightCache.clear();
+    this.lastFetchTime = 0;
+    this.rateLimitBackoff = 0;
+    return await this.getAllFlights();
   }
 
   async updateFlightPositions() {
@@ -414,7 +425,7 @@ class FlightService {
     try {
       return this.flightCache.size;
     } catch (error) {
-      console.error("Error getting flight count:", error);
+      console.error("💥 Error getting flight count:", error);
       return 0;
     }
   }
@@ -428,7 +439,11 @@ class FlightService {
       usingOpenSkyAPI: true,
       hasValidCredentials: !!(process.env.CLIENT_ID && process.env.CLIENT_SECRET),
       rateLimitBackoff: this.rateLimitBackoff,
-      tokenExpiry: this.tokenExpiry
+      tokenExpiry: this.tokenExpiry,
+      isInBackoff: this.rateLimitBackoff > Date.now(),
+      backoffEndTime: this.rateLimitBackoff ? new Date(this.rateLimitBackoff) : null,
+      backoffTimeLeft: this.rateLimitBackoff > Date.now() ? 
+        Math.ceil((this.rateLimitBackoff - Date.now()) / 1000) : 0
     };
   }
 }

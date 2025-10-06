@@ -18,4 +18,5 @@ export type FlightStatus =
   | 'on-time' 
   | 'delayed' 
   | 'landed' 
-  | 'lost-comm';
+  | 'lost-comm'
+  | 'boarding';

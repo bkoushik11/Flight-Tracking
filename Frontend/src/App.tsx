@@ -1,15 +1,22 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import MapPage from './pages/MapPage';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { FlightDetailsPage } from './pages/FlightDetailsPage';
 import { LoginPage } from './pages/LoginPage';
 import RecordingsPage from './pages/RecordingsPage';
 import { useFlights } from './hooks/useFlights';
 import { useAuth } from './contexts/AuthContext';
 import { Flight } from './types/flight';
 import AuthService from './services/authService';
+
+// Stable ProtectedRoute defined at module scope to avoid remounts on App re-render
+const ProtectedRoute: React.FC<{ children: React.ReactNode; isAuthenticated: boolean }> = ({ children, isAuthenticated }) => {
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+};
 
 function App() {
   const {
@@ -21,37 +28,32 @@ function App() {
   const navigate = useNavigate();
 
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
-  const [pendingFlightClick, setPendingFlightClick] = useState<Flight | null>(null);
 
   const handleFlightClick = useCallback((flight: Flight) => {
     if (!isAuthenticated) {
-      // Store the flight for after authentication
-      setPendingFlightClick(flight);
       // Redirect to login page
       navigate('/login');
       return;
     }
     
-    // If authenticated, show flight details
+    // Select the flight to show in split view
     setSelectedFlight(flight);
-    console.log('Flight clicked:', flight.flightNumber);
   }, [isAuthenticated, navigate]);
 
   const handleBackToMap = useCallback(() => {
     setSelectedFlight(null);
-    navigate('/');
-  }, [navigate]);
+    // Don't navigate to '/' as this might be causing the full page refresh
+    // The MapPage component should handle the display logic
+  }, []);
 
-  const handleAuthSuccess = useCallback(() => {
-    if (pendingFlightClick) {
-      // Show the flight details for the pending flight
-      setSelectedFlight(pendingFlightClick);
-      setPendingFlightClick(null);
-      navigate('/');
-    } else {
-      navigate('/');
+  // Keep selectedFlight in sync with live updates
+  useEffect(() => {
+    if (!selectedFlight) return;
+    const latest = flights.find(f => f.id === selectedFlight.id);
+    if (latest && latest !== selectedFlight) {
+      setSelectedFlight(latest);
     }
-  }, [pendingFlightClick, navigate]);
+  }, [flights, selectedFlight]);
 
   const handleLoginSuccess = useCallback(async () => {
     try {
@@ -63,6 +65,7 @@ function App() {
           email: userData.email
         });
       }
+      // Navigate to homepage after successful login
       navigate('/');
     } catch (error) {
       console.error('Login success handler failed:', error);
@@ -84,17 +87,12 @@ function App() {
     navigate('/recordings');
   }, [navigate]);
 
+  // Memoize the flights data to prevent unnecessary re-renders
+  const memoizedFlights = useMemo(() => flights, [flights]);
+
   if (loading || authLoading) {
     return <LoadingSpinner />;
   }
-
-  // Protected Route Component
-  const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    if (!isAuthenticated) {
-      return <Navigate to="/login" replace />;
-    }
-    return <>{children}</>;
-  };
 
   return (
     <Routes>
@@ -103,39 +101,26 @@ function App() {
           <LoginPage
             onBack={handleBackToMap}
             onLoginSuccess={handleLoginSuccess}
-            onSuccess={handleAuthSuccess}
           />
         </ErrorBoundary>
       } />
       <Route path="/" element={
-        <ProtectedRoute>
+        <ProtectedRoute isAuthenticated={isAuthenticated}>
           <ErrorBoundary>
             <MapPage
-              flights={flights}
+              flights={memoizedFlights}
               user={user}
               onFlightClick={handleFlightClick}
               onShowRecordings={handleShowRecordings}
               onLogout={handleLogout}
+              selectedFlight={selectedFlight}
+              onBackToMap={handleBackToMap}
             />
           </ErrorBoundary>
         </ProtectedRoute>
       } />
-      <Route path="/flights/:flightId" element={
-        <ProtectedRoute>
-          {selectedFlight ? (
-            <ErrorBoundary>
-              <FlightDetailsPage
-                flight={selectedFlight}
-                onBack={handleBackToMap}
-              />
-            </ErrorBoundary>
-          ) : (
-            <Navigate to="/" />
-          )}
-        </ProtectedRoute>
-      } />
       <Route path="/recordings" element={
-        <ProtectedRoute>
+        <ProtectedRoute isAuthenticated={isAuthenticated}>
           <ErrorBoundary>
             <RecordingsPage onBack={handleBackToMap} />
           </ErrorBoundary>

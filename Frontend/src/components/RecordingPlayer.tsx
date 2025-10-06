@@ -43,7 +43,7 @@ const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ src, className }) => 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
   return (
-    <div className={`rounded-lg border border-slate-700 bg-slate-900/40 p-3 ${className || ''}`}>
+    <div className={`rounded-lg border border-slate-700 bg-slate-900/40 p-3 backdrop-blur-sm ${className || ''}`}>
       <video
         key={src}
         ref={videoRef}
@@ -56,9 +56,9 @@ const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ src, className }) => 
       >
         <source src={objectUrl || src} type="video/webm" />
       </video>
-      <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
+      <div className="mt-2 flex items-center justify-between text-xs text-cyan-300">
         <span>{error ? error : 'HTML5 Player'}</span>
-        <a href={src} download className="px-2 py-1 rounded border border-green-400/40 text-green-300">Download</a>
+        <a href={src} download className="px-2 py-1 rounded border border-green-400/40 text-green-300 hover:bg-green-500/10 transition-colors">Download</a>
       </div>
     </div>
   );

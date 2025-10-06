@@ -4,6 +4,7 @@ class FlightsGateway {
   constructor(io) {
     this.io = io;
     this.connectedClients = new Map();
+    this.clientRequestTimes = new Map(); // Track client request times to prevent abuse
     this.setupEventHandlers();
   }
 
@@ -18,10 +19,13 @@ class FlightsGateway {
       id: socket.id,
       connectedAt: new Date(),
       lastActivity: new Date(),
-      subscribedFlights: new Set()
+      subscribedFlights: new Set(),
+      lastRequestTime: 0 // Track last request time for this client
     };
     
     this.connectedClients.set(socket.id, clientInfo);
+
+    console.log(`✅ Client connected: ${socket.id}`);
 
     // Send current flights immediately on connect
     this.sendCurrentFlights(socket);
@@ -33,14 +37,33 @@ class FlightsGateway {
     socket.on("subscribe_flight", (data) => this.handleFlightSubscription(socket, data));
     socket.on("unsubscribe_flight", (data) => this.handleFlightUnsubscription(socket, data));
     socket.on("ping", () => this.handlePing(socket));
+    socket.on("refresh_flights", () => this.handleFlightRefresh(socket)); // Add refresh handler
   }
 
   handleDisconnection(socket) {
     this.connectedClients.delete(socket.id);
+    this.clientRequestTimes.delete(socket.id);
+    console.log(`❌ Client disconnected: ${socket.id}`);
   }
 
   async handleFlightRequest(socket) {
-    this.updateClientActivity(socket.id);
+    const now = Date.now();
+    const clientInfo = this.connectedClients.get(socket.id);
+    
+    if (clientInfo) {
+      if (now - clientInfo.lastRequestTime < 120000) {
+        const secondsRemaining = Math.ceil((120000 - (now - clientInfo.lastRequestTime)) / 1000);
+        console.log(`⏭️ Client ${socket.id} requesting too frequently (${secondsRemaining}s left)`);
+        socket.emit("error", { 
+          message: `Please wait ${secondsRemaining} seconds before requesting flights again` 
+        });
+        return;
+      }
+      clientInfo.lastRequestTime = now;
+      this.updateClientActivity(socket.id);
+    }
+    
+    console.log(`📥 Client ${socket.id} requested flights`);
     await this.sendCurrentFlights(socket);
   }
 
@@ -53,6 +76,27 @@ class FlightsGateway {
       console.error("Error getting flight count:", error);
       socket.emit("error", { message: "Failed to get flight count" });
     }
+  }
+
+  async handleFlightRefresh(socket) {
+    const now = Date.now();
+    const clientInfo = this.connectedClients.get(socket.id);
+    
+    if (clientInfo) {
+      if (now - clientInfo.lastRequestTime < 120000) {
+        const secondsRemaining = Math.ceil((120000 - (now - clientInfo.lastRequestTime)) / 1000);
+        console.log(`⏭️ Client ${socket.id} requesting refresh too frequently (${secondsRemaining}s left)`);
+        socket.emit("error", { 
+          message: `Please wait ${secondsRemaining} seconds before refreshing flights` 
+        });
+        return;
+      }
+      clientInfo.lastRequestTime = now;
+      this.updateClientActivity(socket.id);
+    }
+    
+    console.log(`🔄 Client ${socket.id} requested flight refresh`);
+    await this.sendCurrentFlights(socket);
   }
 
   async handleFlightSubscription(socket, { id }) {
@@ -71,12 +115,10 @@ class FlightsGateway {
 
     try {
       console.log(`📥 Client ${socket.id} subscribed to flight ${id}`);
-      // Force refresh to get the latest data for this flight
       const flights = await flightService.getAllFlights();
       const flight = flights.find(f => f.id === id) || null;
       
       if (flight) {
-        // Update flight history before sending
         const nowTs = Date.now();
         const position = { lat: flight.lat, lng: flight.lng, alt: flight.altitude, ts: nowTs };
         if (!flightService.flightHistories.has(id)) {
@@ -84,15 +126,13 @@ class FlightsGateway {
         }
         const arr = flightService.flightHistories.get(id);
         arr.push(position);
-        if (arr.length > 50) {
-          arr.splice(0, arr.length - 50);
+        if (arr.length > 500) {
+          arr.splice(0, arr.length - 500);
         }
-        // attach copy of history to response object
         flight.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
         
         socket.emit("flight", flight);
         console.log(`📤 Sent initial flight data for ${id} to client ${socket.id}`);
-        console.log(`   Position: ${flight.lat.toFixed(4)}, ${flight.lng.toFixed(4)} | Alt: ${flight.altitude} | Speed: ${flight.speed}`);
       } else {
         console.log(`⚠️ Flight ${id} not found for client ${socket.id}`);
         socket.emit("error", { message: `Flight ${id} not found` });
@@ -113,6 +153,7 @@ class FlightsGateway {
     if (clientInfo) {
       clientInfo.subscribedFlights.delete(id);
     }
+    console.log(`🚪 Client ${socket.id} unsubscribed from flight ${id}`);
   }
 
   handlePing(socket) {
@@ -131,6 +172,7 @@ class FlightsGateway {
     try {
       const flights = await flightService.getAllFlights();
       socket.emit("flights", flights);
+      console.log(`📤 Sent ${flights.length} flights to client ${socket.id}`);
     } catch (error) {
       socket.emit("error", { 
         message: "Failed to fetch flights", 
@@ -141,16 +183,18 @@ class FlightsGateway {
 
   broadcastFlightUpdate(flights) {
     try {
-      // Broadcast aggregated list to all clients
-      this.io.emit("flights", flights);
+      // Basic rate limiting to avoid overly frequent emits
+      const now = Date.now();
+      if (!this._lastBroadcastTs || now - this._lastBroadcastTs > 400) {
+        this._lastBroadcastTs = now;
+        this.io.emit("flights", flights);
+      }
 
-      // Broadcast individual flight updates to subscribed clients
       flights.forEach((flight) => {
         const room = this._flightRoom(flight.id);
         const roomSize = this.io.sockets.adapter.rooms.get(room)?.size || 0;
         if (roomSize > 0) {
-          console.log(`📡 Broadcasting flight ${flight.id} to ${roomSize} subscribers at ${new Date().toISOString()}`);
-          console.log(`   Position: ${flight.lat.toFixed(4)}, ${flight.lng.toFixed(4)} | Alt: ${flight.altitude} | Speed: ${flight.speed}`);
+          console.log(`📡 Broadcasting flight ${flight.id} to ${roomSize} subscribers`);
           this.io.to(room).emit("flight", flight);
         }
       });
@@ -196,7 +240,6 @@ class FlightsGateway {
     }));
   }
 
-  // Cleanup inactive clients (call periodically)
   cleanupInactiveClients(maxInactiveMinutes = 30) {
     const now = new Date();
     const inactiveClients = [];
@@ -214,10 +257,11 @@ class FlightsGateway {
         socket.disconnect(true);
       }
       this.connectedClients.delete(socketId);
+      this.clientRequestTimes.delete(socketId);
     });
 
     if (inactiveClients.length > 0) {
-      console.log(`Cleaned up ${inactiveClients.length} inactive clients`);
+      console.log(`🧹 Cleaned up ${inactiveClients.length} inactive clients`);
     }
   }
 }

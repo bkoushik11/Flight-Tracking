@@ -13,8 +13,8 @@ interface FlightStatusPanelProps {
   realFlightData: any;
   flight: any;
   lastUpdate: number;
-  systemStatus: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
-  radarRotation: number;
+  // systemStatus: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
+  // radarRotation: number;
   formatTime: (timestamp: number) => string;
   formatAltitude: (alt: number) => string;
   formatSpeed: (speed: number) => string;
@@ -25,8 +25,8 @@ const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
   realFlightData,
   flight,
   lastUpdate,
-  systemStatus,
-  radarRotation,
+  // systemStatus,
+  // radarRotation,
   formatTime,
   formatAltitude,
   formatSpeed
@@ -35,10 +35,9 @@ const FlightStatusPanel: React.FC<FlightStatusPanelProps> = ({
   const StatusIndicator: React.FC<{ status: string; color: string }> = ({ status, color }) => (
     <div className="flex items-center gap-2">
       <div 
-        className="w-2 h-2 rounded-full animate-pulse" 
-        style={{ backgroundColor: color }}
+        className={`w-2 h-2 rounded-full animate-pulse ${color === '#10B981' ? 'bg-emerald-500' : 'bg-cyan-500'}`}
       />
-      <span className="text-sm font-medium" style={{ color }}>
+      <span className={`text-sm font-medium ${color === '#10B981' ? 'text-emerald-500' : 'text-cyan-500'}`}>
         {status}
       </span>
     </div>

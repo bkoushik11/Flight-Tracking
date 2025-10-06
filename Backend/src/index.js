@@ -8,7 +8,6 @@ const FlightsGateway = require("./sockets/flights.gateway");
 
 const { CONFIG } = require("./utils/constants");
 const PORT = CONFIG.PORT;
-const TICK_MS = CONFIG.TICK_MS;
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -18,59 +17,135 @@ const io = new Server(server, {
 // Initialize socket gateway
 const flightsGateway = new FlightsGateway(io);
 
-// Set up periodic flight data fetching from OpenSky API
-let updateInterval;
+// Store previous flight data to compare for changes
+let previousFlights = [];
+let isCheckingForChanges = false;
 
-const fetchAndBroadcastFlights = async () => {
+// Function to check for flight changes and broadcast if needed
+const checkAndBroadcastFlightChanges = async () => {
+  // Prevent multiple concurrent checks
+  if (isCheckingForChanges) {
+    console.log('⏭️ Skipping check - already checking for changes');
+    return;
+  }
+  
+  isCheckingForChanges = true;
+  
   try {
-    console.log('🔄 Fetching flights from OpenSky API at:', new Date().toISOString());
-    const flights = await flightService.getAllFlights();
-    console.log(`📡 Broadcasting ${flights.length} flights to clients`);
-    flightsGateway.broadcastFlightUpdate(flights);
+    console.log('🔄 Checking for flight changes at:', new Date().toISOString());
     
-    // Also broadcast individual flight updates for better real-time experience
-    flights.forEach(flight => {
-      // Update individual flight history
-      const nowTs = Date.now();
-      const position = { lat: flight.lat, lng: flight.lng, alt: flight.altitude, ts: nowTs };
-      if (!flightService.flightHistories.has(flight.id)) {
-        flightService.flightHistories.set(flight.id, []);
+    // Check if we're in rate limit backoff period
+    const currentTime = Date.now();
+    const rateLimitBackoff = flightService.rateLimitBackoff;
+    if (rateLimitBackoff > currentTime) {
+      const backoffMinutes = Math.ceil((rateLimitBackoff - currentTime) / (60 * 1000));
+      console.log(`⏭️ Rate limit backoff active for ${backoffMinutes} more minutes until ${new Date(rateLimitBackoff).toLocaleTimeString()}`);
+      // Check if we have cached data to send
+      const cachedCount = flightService.getFlightCount();
+      if (cachedCount > 0) {
+        console.log(`📦 Sending ${cachedCount} cached flights to clients during backoff`);
+        const cachedFlights = Array.from(flightService.flightCache.values());
+        flightsGateway.broadcastFlightUpdate(cachedFlights);
+        return;
+      } else {
+        console.log('📭 No cached flight data available during backoff period');
+        flightsGateway.broadcastFlightUpdate([]);
+        return;
       }
-      const arr = flightService.flightHistories.get(flight.id);
-      arr.push(position);
-      if (arr.length > 50) {
-        arr.splice(0, arr.length - 50);
-      }
-      // attach copy of history to response object
-      flight.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
-    });
+    }
     
-    console.log(`✅ Broadcasted ${flights.length} flights at:`, new Date().toISOString());
+    const currentFlights = await flightService.getAllFlights();
+    
+    // Always broadcast current flights to keep clients updated
+    console.log(`📡 Broadcasting ${currentFlights.length} flights to clients`);
+    flightsGateway.broadcastFlightUpdate(currentFlights);
+    
+    // Only check for significant changes for detailed processing
+    if (hasFlightDataChanged(previousFlights, currentFlights)) {
+      console.log(`🔄 Significant flight data changes detected`);
+      
+      // Update individual flight histories
+      currentFlights.forEach(flight => {
+        const nowTs = Date.now();
+        const position = { lat: flight.lat, lng: flight.lng, alt: flight.altitude, ts: nowTs };
+        if (!flightService.flightHistories.has(flight.id)) {
+          flightService.flightHistories.set(flight.id, []);
+        }
+        const arr = flightService.flightHistories.get(flight.id);
+        arr.push(position);
+        if (arr.length > 500) {
+          arr.splice(0, arr.length - 500);
+        }
+        flight.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
+      });
+      
+      // Update previous flights data
+      previousFlights = currentFlights;
+      console.log(`✅ Broadcasted ${currentFlights.length} flights at:`, new Date().toISOString());
+    } else {
+      console.log('⏭️ No significant flight data changes detected');
+    }
   } catch (error) {
-    console.error('Error fetching flights:', error);
+    console.error('💥 Error checking flight changes:', error);
+    // Even on error, try to send cached data if available
+    const cachedCount = flightService.getFlightCount();
+    if (cachedCount > 0) {
+      console.log(`📦 Sending ${cachedCount} cached flights due to error`);
+      const cachedFlights = Array.from(flightService.flightCache.values());
+      flightsGateway.broadcastFlightUpdate(cachedFlights);
+    } else {
+      console.log('📭 No flight data available, sending empty array to clients');
+      flightsGateway.broadcastFlightUpdate([]);
+    }
+  } finally {
+    isCheckingForChanges = false;
   }
 };
 
-// Add additional logging for periodic updates
-const startPeriodicUpdates = () => {
-  updateInterval = setInterval(() => {
-    console.log('⏰ Triggering periodic flight update at:', new Date().toISOString());
-    fetchAndBroadcastFlights();
-  }, TICK_MS);
-  console.log(`🔄 Started periodic flight updates every ${TICK_MS}ms`);
+// Function to compare flight data for changes with tolerance
+const hasFlightDataChanged = (prevFlights, currentFlights) => {
+  // If flight count changed, there are definitely changes
+  if (prevFlights.length !== currentFlights.length) {
+    return true;
+  }
+  
+  // Check if any flight data has changed significantly
+  const hasChanges = currentFlights.some((currentFlight, index) => {
+    const prevFlight = prevFlights[index];
+    
+    // Define more sensitive tolerance levels for significant changes to ensure updates are visible
+    const latTolerance = 0.000005; // ~0.5 meter (even more sensitive)
+    const lngTolerance = 0.000005; // ~0.5 meter (even more sensitive)
+    const altTolerance = 2;         // 2 feet (even more sensitive)
+    const speedTolerance = 1;       // 1 knot (even more sensitive)
+    const headingTolerance = 0.5;   // 0.5 degree (even more sensitive)
+    
+    return (
+      Math.abs(currentFlight.lat - prevFlight.lat) > latTolerance ||
+      Math.abs(currentFlight.lng - prevFlight.lng) > lngTolerance ||
+      Math.abs(currentFlight.altitude - prevFlight.altitude) > altTolerance ||
+      Math.abs(currentFlight.speed - prevFlight.speed) > speedTolerance ||
+      Math.abs(currentFlight.heading - prevFlight.heading) > headingTolerance ||
+      currentFlight.status !== prevFlight.status ||
+      currentFlight.flightNumber !== prevFlight.flightNumber
+    );
+  });
+  
+  return hasChanges;
 };
 
-startPeriodicUpdates();
+// Set up periodic flight fetching every 15 seconds to reduce frequency of updates
+console.log('🔄 Setting up periodic flight fetching every 15 seconds');
+setInterval(checkAndBroadcastFlightChanges, 15 * 1000);
 
-// Initial fetch
-fetchAndBroadcastFlights();
+// Initial fetch - only do this once on startup
+checkAndBroadcastFlightChanges();
+
+console.log('🔄 Flight updates will occur every 60 seconds or when data changes');
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
   console.log("\nGracefully shutting down...");
-  if (updateInterval) {
-    clearInterval(updateInterval);
-  }
   
   // Disconnect from database
   await database.disconnect();
@@ -83,9 +158,6 @@ process.on("SIGINT", async () => {
 
 process.on("SIGTERM", async () => {
   console.log("\nGracefully shutting down...");
-  if (updateInterval) {
-    clearInterval(updateInterval);
-  }
   
   // Disconnect from database
   await database.disconnect();
@@ -112,7 +184,7 @@ async function startServer() {
     server.listen(PORT, () => {
       console.log(`🚀 Flight Tracker Backend running on http://localhost:${PORT}`);
       console.log(`📡 WebSocket server ready for real-time updates`);
-      console.log(`✈️  OpenSky API integration enabled with ${TICK_MS}ms refresh interval`);
+      console.log(`✈️  OpenSky API integration enabled with periodic updates every 15 seconds`);
       console.log(`🔐 Authentication endpoints available at /api/auth`);
     });
     
