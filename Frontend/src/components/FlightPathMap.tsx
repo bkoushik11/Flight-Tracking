@@ -1,9 +1,19 @@
 import React, { useRef, useEffect, useMemo, memo, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { INDIAN_AIRPORTS } from './IndianAirports';
-import { recordingService } from '../services/recordingService';
+import { ActiveTileLayer, useMapLayer } from './Layers';
+
+// Component to handle map events
+const MapEvents: React.FC<{ onClick?: () => void }> = ({ onClick }) => {
+  useMapEvents({
+    click: () => {
+      onClick?.();
+    },
+  });
+  return null;
+};
 
 // Fix for default marker icons in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -15,6 +25,7 @@ L.Icon.Default.mergeOptions({
 
 interface FlightPathMapProps {
   selectedFlight: any;
+  onPathClick?: () => void;
 }
 
 const VIEW_STORAGE_KEY = 'flightPathMap:view';
@@ -115,7 +126,8 @@ const FitToSelection: React.FC<{ selectedFlight: any; routePath: [number, number
 };
 
 // Create airplane icon using Unicode symbol (without background)
-const createAirplaneIcon = (heading: number) => {
+const createAirplaneIcon = (heading: number, isSelected?: boolean) => {
+  const color = isSelected ? '#10b981' : '#06b6d4'; // Green for selected, blue for others
   return L.divIcon({
     className: 'custom-airplane-icon',
     html: `
@@ -129,7 +141,7 @@ const createAirplaneIcon = (heading: number) => {
       ">
         <div style="
           font-size: 24px;
-          color: #06b6d4;
+          color: ${color};
           font-weight: bold;
           text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
         ">✈</div>
@@ -139,7 +151,6 @@ const createAirplaneIcon = (heading: number) => {
     iconAnchor: [12, 12],
   });
 };
-
 
 // Create general airport icon with name
 const createGeneralAirportIcon = (airportName: string) => {
@@ -183,315 +194,54 @@ const createGeneralAirportIcon = (airportName: string) => {
   });
 };
 
-
 // Default center is handled by getInitialView fallback
 
-export const FlightPathMap: React.FC<FlightPathMapProps> = ({ selectedFlight }) => {
-  // Recording state
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [recordingError, setRecordingError] = useState<string | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordedChunksRef = useRef<Blob[]>([]);
-  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+export const FlightPathMapInner: React.FC<FlightPathMapProps> = ({ selectedFlight, onPathClick }) => {
+  const [routePath, setRoutePath] = useState<[number, number][]>([]);
+  const { activeLayer } = useMapLayer();
 
-  // Start recording the screen
-  const startRecording = async () => {
-    try {
-      setRecordingError(null);
-      
-      // Get screen recording stream
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true
-      });
-
-      // Create media recorder
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm'
-      });
-
-      mediaRecorderRef.current = mediaRecorder;
-      recordedChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          recordedChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        // Stop all tracks
-        stream.getTracks().forEach(track => track.stop());
-        
-        // Save recording
-        saveRecording();
-      };
-
-      mediaRecorder.onerror = (event) => {
-        console.error('MediaRecorder error:', event);
-        setRecordingError('Recording error occurred');
-        stopRecording();
-      };
-
-      // Start recording
-      mediaRecorder.start();
-      setIsRecording(true);
-      setRecordingTime(0);
-
-      // Update recording time every second
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-      }
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-
-    } catch (error) {
-      console.error('Error starting recording:', error);
-      setRecordingError('Failed to start recording. Please ensure you have given permission to record your screen.');
-      setIsRecording(false);
-    }
-  };
-
-  // Stop recording
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-    }
-  };
-
-  // Save recording to backend
-  const saveRecording = async () => {
-    if (recordedChunksRef.current.length === 0) {
-      setRecordingError('No recording data to save');
-      return;
-    }
-
-    try {
-      const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-      const title = `Flight Path Recording - ${selectedFlight.flightNumber} - ${new Date().toLocaleString()}`;
-      
-      await recordingService.uploadRecording(blob, {
-        title,
-        durationMs: recordingTime * 1000
-      });
-
-      // Show success message
-      alert('Recording saved successfully!');
-      
-      // Clear recorded chunks
-      recordedChunksRef.current = [];
-    } catch (error) {
-      console.error('Error saving recording:', error);
-      setRecordingError('Failed to save recording');
-    }
-  };
-
-  // Format recording time as MM:SS
-  const formatRecordingTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-      }
-      
-      // Stop recording if component unmounts while recording
-      if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.stop();
-      }
-    };
-  }, [isRecording]);
-
-  // Prepare full flight path (from origin to destination) - includes current position
-  const fullFlightPath: [number, number][] = useMemo(() => {
-    const path: [number, number][] = [];
-    
-    // Add historical path points
-    if (selectedFlight.path && selectedFlight.path.length > 0) {
-      path.push(...selectedFlight.path.map((point: [number, number]) => [point[0], point[1]] as [number, number]));
-    }
-    
-    // Add current position if it exists and is different from the last path point
-    if (selectedFlight.latitude && selectedFlight.longitude) {
-      const currentPos: [number, number] = [selectedFlight.latitude, selectedFlight.longitude];
-      
-      // Only add current position if it's different from the last point in the path
-      if (path.length === 0 || 
-          Math.abs(path[path.length - 1][0] - currentPos[0]) > 0.0001 || 
-          Math.abs(path[path.length - 1][1] - currentPos[1]) > 0.0001) {
-        path.push(currentPos);
-      }
-    }
-    
-    return path;
-  }, [selectedFlight.path, selectedFlight.latitude, selectedFlight.longitude]);
-
-
-  // Build the desired green "route" polyline - now includes current position
-  const routePath: [number, number][] = useMemo(() => {
-    const path: [number, number][] = [];
-    
-    // Add historical path points
-    if (selectedFlight.path && selectedFlight.path.length > 0) {
-      path.push(...selectedFlight.path.map((point: [number, number]) => [point[0], point[1]] as [number, number]));
-    }
-    
-    // Add current position if it exists and is different from the last path point
-    if (selectedFlight.latitude && selectedFlight.longitude) {
-      const currentPos: [number, number] = [selectedFlight.latitude, selectedFlight.longitude];
-      
-      // Only add current position if it's different from the last point in the path
-      if (path.length === 0 || 
-          Math.abs(path[path.length - 1][0] - currentPos[0]) > 0.0001 || 
-          Math.abs(path[path.length - 1][1] - currentPos[1]) > 0.0001) {
-        path.push(currentPos);
-      }
-    }
-    
-    return path;
-  }, [selectedFlight.path, selectedFlight.latitude, selectedFlight.longitude]);
-
-  // Map center is restored via persisted view now
+  const initialView = useMemo(() => getInitialView(), []);
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 rounded-lg overflow-hidden min-h-0">
-        <MapContainer 
-          style={{ height: '100%', width: '100%' }}
-          zoomControl={true}
-          {...(() => {
-            // compute once per mount via closure
-            const iv = getInitialView();
-            return { center: iv.center as [number, number], zoom: iv.zoom };
-          })()}
-        >
-          <PersistView />
-          <FitToSelection selectedFlight={selectedFlight} routePath={routePath} />
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            keepBuffer={2}
-          />
-          
-          {/* Full flight path (faint line to show complete route) */}
-          {fullFlightPath.length > 0 && (
-            <Polyline
-              positions={fullFlightPath}
-              color="#94a3b8"
-              weight={1}
-              opacity={0.5}
-              dashArray="5, 5"
-            />
-          )}
-          
-          {/* Desired route path from origin to destination or to border (green) */}
-          {routePath.length > 1 && (
-            <Polyline
-              positions={routePath}
-              color="#10b981"
-              weight={3}
-              opacity={0.9}
-            />
-          )}
-          
-          {/* Keep a subtle full path trace if needed */}
-          {selectedFlight.path && selectedFlight.path.length > 0 && (
-            <Polyline
-              positions={selectedFlight.path as [number, number][]}
-              color="#64748b"
-              weight={1}
-              opacity={0.4}
-              dashArray="4,4"
-            />
-          )}
-          
-          
-          {/* Current flight marker */}
-          {selectedFlight.latitude && selectedFlight.longitude && (
-            <Marker
-              position={[selectedFlight.latitude, selectedFlight.longitude]}
-              icon={createAirplaneIcon(selectedFlight.heading || 0)}
-            />
-          )}
-          
-          {/* Major Indian Airports */}
-          {INDIAN_AIRPORTS.map((airport, index) => (
-            <Marker
-              key={`airport-${index}`}
-              position={[airport.lat, airport.lng]}
-              icon={createGeneralAirportIcon(airport.name)}
-            />
-          ))}
-        </MapContainer>
-      </div>
-      
-      {/* Record Button Section */}
-      <div className="mt-2 flex justify-center">
-        <div className="bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-lg p-1 shadow-lg">
-          {isRecording ? (
-            <button
-              onClick={stopRecording}
-              className="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-all text-xs flex items-center justify-center gap-1"
-            >
-              <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-              <span className="hidden sm:inline">Stop</span>
-            </button>
-          ) : (
-            <button
-              onClick={startRecording}
-              className="px-3 py-1.5 bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 rounded hover:bg-cyan-500/30 transition-all text-xs flex items-center justify-center gap-1"
-            >
-              <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
-              <span className="hidden sm:inline">Record</span>
-            </button>
-          )}
-        </div>
-      </div>
-      
-      {/* Recording Indicator - Shown when recording */}
-      {isRecording && (
-        <div className="mt-2 flex justify-center">
-          <div className="bg-red-500 text-white px-3 py-1 rounded-full flex items-center gap-1 text-xs animate-pulse">
-            <div className="w-2 h-2 bg-white rounded-full"></div>
-            <span>REC</span> {formatRecordingTime(recordingTime)}
-          </div>
-        </div>
+    <MapContainer
+      center={initialView.center}
+      zoom={initialView.zoom}
+      style={{ height: '100%', width: '100%' }}
+      attributionControl={false}
+    >
+      <MapEvents onClick={onPathClick} />
+      <ActiveTileLayer key={activeLayer.id} />
+      <PersistView />
+      <FitToSelection selectedFlight={selectedFlight} routePath={routePath} />
+      {routePath.length > 1 && <Polyline positions={routePath} color="#10b981" opacity={0.7} weight={3} />}
+      {selectedFlight && (
+        <Marker
+          position={[selectedFlight.latitude, selectedFlight.longitude]}
+          icon={createAirplaneIcon(selectedFlight.heading, true)}
+        />
       )}
-      
-      {/* Recording Error Message */}
-      {recordingError && (
-        <div className="mt-2 flex justify-center">
-          <div className="bg-red-500 text-white px-3 py-1 rounded text-xs">
-            <span className="hidden sm:inline">{recordingError}</span>
-            <span className="sm:hidden">Error</span>
-            <button 
-              onClick={() => setRecordingError(null)}
-              className="ml-2 text-white hover:text-gray-200"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+      {INDIAN_AIRPORTS.map((airport, index) => (
+        <Marker
+          key={index}
+          position={[airport.lat, airport.lng]}
+          icon={createGeneralAirportIcon(airport.name)}
+        />
+      ))}
+    </MapContainer>
   );
 };
 
-// Memoize the FlightPathMap component
-export default memo(FlightPathMap, (prevProps: { selectedFlight: any }, nextProps: { selectedFlight: any }) => {
+// Export FlightPathMapInner without the MapLayerProvider wrapper
+const FlightPathMapWrapper: React.FC<FlightPathMapProps> = ({ selectedFlight, onPathClick }) => {
+  return (
+    <FlightPathMapInner 
+      selectedFlight={selectedFlight} 
+      onPathClick={onPathClick}
+    />
+  );
+};
+
+export default memo(FlightPathMapWrapper, (prevProps: { selectedFlight: any; onPathClick?: () => void }, nextProps: { selectedFlight: any; onPathClick?: () => void }) => {
   // Only re-render if the selected flight has changed
-  return prevProps.selectedFlight === nextProps.selectedFlight;
+  return prevProps.selectedFlight === nextProps.selectedFlight && prevProps.onPathClick === nextProps.onPathClick;
 });

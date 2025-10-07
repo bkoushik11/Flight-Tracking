@@ -70,6 +70,48 @@ html, body {
   animation: fadeIn 0.3s ease-out forwards;
 }
 
+/* Fast slide-in animation for left panel */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.15s ease-out forwards;
+}
+
+/* Fast slide-out animation for left panel */
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+.animate-slideOutLeft {
+  animation: slideOutLeft 0.1s ease-in forwards;
+}
+
+/* Instant transition for immediate response */
+.transition-instant {
+  transition: none !important;
+}
+
+/* Fast transition for smooth but quick animations */
+.transition-fast {
+  transition: all 0.1s ease-out !important;
+}
+
 /* Midnight Command Color Palette CSS Classes */
 .midnight-panel {
   background: linear-gradient(135deg, #141B2D 0%, #0A0E1A 100%);

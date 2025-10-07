@@ -134,14 +134,14 @@ const hasFlightDataChanged = (prevFlights, currentFlights) => {
   return hasChanges;
 };
 
-// Set up periodic flight fetching every 15 seconds to reduce frequency of updates
-console.log('🔄 Setting up periodic flight fetching every 15 seconds');
-setInterval(checkAndBroadcastFlightChanges, 15 * 1000);
+// Set up periodic flight fetching every 5 minutes to reduce frequency of updates
+console.log('🔄 Setting up periodic flight fetching every 5 minutes');
+setInterval(checkAndBroadcastFlightChanges, 5 * 60 * 1000);
 
 // Initial fetch - only do this once on startup
 checkAndBroadcastFlightChanges();
 
-console.log('🔄 Flight updates will occur every 60 seconds or when data changes');
+console.log('🔄 Flight updates will occur every 5 minutes or when data changes');
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
@@ -184,7 +184,7 @@ async function startServer() {
     server.listen(PORT, () => {
       console.log(`🚀 Flight Tracker Backend running on http://localhost:${PORT}`);
       console.log(`📡 WebSocket server ready for real-time updates`);
-      console.log(`✈️  OpenSky API integration enabled with periodic updates every 15 seconds`);
+      console.log(`✈️  OpenSky API integration enabled with periodic updates every 5 minutes`);
       console.log(`🔐 Authentication endpoints available at /api/auth`);
     });
     

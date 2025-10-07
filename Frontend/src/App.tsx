@@ -9,6 +9,9 @@ import { useFlights } from './hooks/useFlights';
 import { useAuth } from './contexts/AuthContext';
 import { Flight } from './types/flight';
 import AuthService from './services/authService';
+import { MapProvider } from './contexts/MapContext';
+import 'leaflet/dist/leaflet.css';
+import 'leaflet-draw/dist/leaflet.draw.css';
 
 // Stable ProtectedRoute defined at module scope to avoid remounts on App re-render
 const ProtectedRoute: React.FC<{ children: React.ReactNode; isAuthenticated: boolean }> = ({ children, isAuthenticated }) => {
@@ -28,6 +31,7 @@ function App() {
   const navigate = useNavigate();
 
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
+  const [showLeftPanel, setShowLeftPanel] = useState(false);
 
   const handleFlightClick = useCallback((flight: Flight) => {
     if (!isAuthenticated) {
@@ -36,12 +40,20 @@ function App() {
       return;
     }
     
-    // Select the flight to show in split view
+    // Show left panel directly when clicking on flight
     setSelectedFlight(flight);
+    setShowLeftPanel(true);
   }, [isAuthenticated, navigate]);
+
+  const handleMapClick = useCallback(() => {
+    // Clear selected flight when clicking on the map
+    setSelectedFlight(null);
+    setShowLeftPanel(false);
+  }, []);
 
   const handleBackToMap = useCallback(() => {
     setSelectedFlight(null);
+    setShowLeftPanel(false);
     // Don't navigate to '/' as this might be causing the full page refresh
     // The MapPage component should handle the display logic
   }, []);
@@ -95,39 +107,43 @@ function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/login" element={
-        <ErrorBoundary>
-          <LoginPage
-            onBack={handleBackToMap}
-            onLoginSuccess={handleLoginSuccess}
-          />
-        </ErrorBoundary>
-      } />
-      <Route path="/" element={
-        <ProtectedRoute isAuthenticated={isAuthenticated}>
+    <MapProvider>
+      <Routes>
+        <Route path="/login" element={
           <ErrorBoundary>
-            <MapPage
-              flights={memoizedFlights}
-              user={user}
-              onFlightClick={handleFlightClick}
-              onShowRecordings={handleShowRecordings}
-              onLogout={handleLogout}
-              selectedFlight={selectedFlight}
-              onBackToMap={handleBackToMap}
+            <LoginPage
+              onBack={handleBackToMap}
+              onLoginSuccess={handleLoginSuccess}
             />
           </ErrorBoundary>
-        </ProtectedRoute>
-      } />
-      <Route path="/recordings" element={
-        <ProtectedRoute isAuthenticated={isAuthenticated}>
-          <ErrorBoundary>
-            <RecordingsPage onBack={handleBackToMap} />
-          </ErrorBoundary>
-        </ProtectedRoute>
-      } />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        } />
+        <Route path="/" element={
+          <ProtectedRoute isAuthenticated={isAuthenticated}>
+            <ErrorBoundary>
+              <MapPage
+                flights={memoizedFlights}
+                user={user}
+                onFlightClick={handleFlightClick}
+                onShowRecordings={handleShowRecordings}
+                onLogout={handleLogout}
+                onMapClick={handleMapClick}
+                selectedFlight={selectedFlight}
+                onBackToMap={handleBackToMap}
+                showLeftPanel={showLeftPanel}
+              />
+            </ErrorBoundary>
+          </ProtectedRoute>
+        } />
+        <Route path="/recordings" element={
+          <ProtectedRoute isAuthenticated={isAuthenticated}>
+            <ErrorBoundary>
+              <RecordingsPage onBack={handleBackToMap} />
+            </ErrorBoundary>
+          </ProtectedRoute>
+        } />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </MapProvider>
   );
 }
 

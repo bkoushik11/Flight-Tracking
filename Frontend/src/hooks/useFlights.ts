@@ -118,7 +118,7 @@ export const useFlights = () => {
       Math.abs(prevFlight.altitude - nextFlight.altitude) > altTolerance ||
       Math.abs(prevFlight.speed - nextFlight.speed) > speedTolerance ||
       Math.abs(prevFlight.heading - nextFlight.heading) > headingTolerance ||
-      prevFlight.status !== nextFlight.status ||
+      
       prevFlight.flightNumber !== nextFlight.flightNumber
     );
   }, []);

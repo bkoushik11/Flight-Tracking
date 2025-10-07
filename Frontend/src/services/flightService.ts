@@ -42,7 +42,6 @@ export class FlightService {
 
       // Map backend -> frontend flight shape
       const flights: Flight[] = rawFlights.map((f) => {
-        const status = String(f.status || 'on-time');
         const path = Array.isArray(f.history)
           ? f.history.map((h: any) => [Number(h.lat), Number(h.lng)] as [number, number])
           : [];
@@ -54,7 +53,6 @@ export class FlightService {
           altitude: Number(f.altitude ?? 0),
           speed: Number(f.speed ?? 0),
           heading: Number(f.heading ?? 0),
-          status: status as any,
           aircraft: String(f.aircraft || 'Unknown'),
           origin: String(f.origin || 'N/A'),
           destination: String(f.destination || 'N/A'),
@@ -128,7 +126,6 @@ export class FlightService {
         altitude: Number(f.altitude ?? 0),
         speed: Number(f.speed ?? 0),
         heading: Number(f.heading ?? 0),
-        status: status as any,
         aircraft: String(f.aircraft || 'Unknown'),
         origin: String(f.origin || 'N/A'),
         destination: String(f.destination || 'N/A'),

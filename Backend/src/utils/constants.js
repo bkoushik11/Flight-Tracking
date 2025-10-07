@@ -63,6 +63,6 @@ module.exports = {
     PORT: Number(process.env.PORT) || 5000,
     TICK_MS: Number(process.env.TICK_MS) || 30000, // Changed to 30 seconds to reduce refresh frequency
     CORS_ORIGIN: process.env.CORS_ORIGIN || "*",
-    FLIGHT_COUNT: Number(process.env.FLIGHT_COUNT) || 200
+    FLIGHT_COUNT: Number(process.env.FLIGHT_COUNT) || Number.MAX_SAFE_INTEGER // Set to maximum for unlimited flights
   }
 };

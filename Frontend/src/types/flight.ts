@@ -6,7 +6,7 @@ export interface Flight {
   altitude: number; // feet
   speed: number; // knots
   heading: number; // degrees
-  status: FlightStatus;
+  // status: FlightStatus; // Removed as requested
   aircraft: string;
   origin: string;
   destination: string;
@@ -14,9 +14,9 @@ export interface Flight {
   path: [number, number][];
 }
 
-export type FlightStatus = 
-  | 'on-time' 
-  | 'delayed' 
-  | 'landed' 
-  | 'lost-comm'
-  | 'boarding';
+// export type FlightStatus = 
+//   | 'on-time' 
+//   | 'delayed' 
+//   | 'landed' 
+//   | 'lost-comm'
+//   | 'boarding'; // Removed as requested
