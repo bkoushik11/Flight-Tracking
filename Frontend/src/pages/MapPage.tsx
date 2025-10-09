@@ -1,17 +1,19 @@
-import React, { useState, useCallback, memo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { FlightMap } from '../components/FlightMap';
 import { Layers, MapLayerProvider } from '../components/Layers';
 import { LeftPanel } from '../components/LeftPanel';
 import { Flight } from '../types/flight';
-import { Layers as LayersIcon } from 'lucide-react';
+// import { Layers as LayersIcon } from 'lucide-react';
+import pathTrackData from '../Data/pathtrack.json';
+import { Position as PastTrackPosition } from '../components/PastTrackLayer';
 // import { useNavigate } from 'react-router-dom';
 import { INDIAN_AIRPORTS } from '../components/IndianAirports';
+import { Play, Pause, RotateCcw } from 'lucide-react';
 
 interface MapPageProps {
   flights: Flight[];
   user: any;
   onFlightClick: (flight: Flight) => void;
-  onShowRecordings: () => void;
   onLogout: () => void;
   onMapClick: () => void;
   selectedFlight: Flight | null;
@@ -22,7 +24,6 @@ interface MapPageProps {
 const MapPageInner: React.FC<MapPageProps> = ({ 
   flights, 
   onFlightClick, 
-  onShowRecordings, 
   onLogout,
   onMapClick,
   selectedFlight,
@@ -32,6 +33,10 @@ const MapPageInner: React.FC<MapPageProps> = ({
   const [mousePosition, setMousePosition] = useState<{ lat: number; lng: number } | null>(null);
   const [notifications, setNotifications] = useState<{id: string, message: string, type: string}[]>([]);
   const notificationTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const [showPastTrack, setShowPastTrack] = useState<boolean>(true);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playIndex, setPlayIndex] = useState<number>(0);
+  const positions: PastTrackPosition[] = (pathTrackData as any).positions?.slice(0, 12) || [];
   // const navigate = useNavigate();
 
   // Throttle mouse move updates to prevent excessive re-renders
@@ -101,6 +106,26 @@ const MapPageInner: React.FC<MapPageProps> = ({
     };
   }, []);
 
+  // Simple playback effect advancing through positions
+  useEffect(() => {
+    if (!showPastTrack || !isPlaying || positions.length === 0) return;
+    if (playIndex >= positions.length - 1) return;
+    const id = setInterval(() => {
+      setPlayIndex((idx) => Math.min(idx + 1, positions.length - 1));
+    }, 800);
+    return () => clearInterval(id);
+  }, [showPastTrack, isPlaying, playIndex, positions.length]);
+
+  const handleReplay = () => {
+    setPlayIndex(0);
+    setIsPlaying(true);
+    setShowPastTrack(true);
+  };
+
+  const currentPlaybackPos = positions.length
+    ? positions[Math.min(playIndex, positions.length - 1)]
+    : null;
+
   // Keep the right map container from remounting by stabilizing props/handlers
   // onFlightClick is memoized from parent; no extra wrapper needed
 
@@ -122,6 +147,7 @@ const MapPageInner: React.FC<MapPageProps> = ({
             onMapClick={onMapClick}
             onMouseMove={handleMapMouseMove}
             selectedFlight={selectedFlight}
+            pastTrack={{ positions, isVisible: showPastTrack, flightId: (pathTrackData as any).flightId || 'past-track', currentIndex: playIndex }}
           />
           
           {/* Logout Button - Positioned at top right (full screen) or top left (split screen) */}
@@ -139,9 +165,19 @@ const MapPageInner: React.FC<MapPageProps> = ({
           </div>
           
           {/* Layers Control - Positioned below logout button */}
-          <div className={`absolute ${selectedFlight ? 'top-20 left-4' : 'top-20 right-4'} z-[1000]`}>
-            <div className="bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-lg shadow-lg">
+          <div className={`absolute ${selectedFlight ? 'top-20 left-4' : 'top-20 right-2'} z-[1000]`}>
+            <div className="inline-flex p-0.5 bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-md shadow-lg">
               <Layers />
+            </div>
+            {/* Path Track Toggle below Layers */}
+            <div className="mt-2 bg-slate-900/90 backdrop-blur-md border border-amber-400/40 rounded-lg shadow-lg">
+              <button
+                onClick={() => { setShowPastTrack(!showPastTrack); if (!showPastTrack) { setPlayIndex(0); } }}
+                className={`px-3 py-2 flex items-center gap-2 text-amber-300 hover:bg-amber-500/20 transition-all rounded-lg ${showPastTrack ? 'bg-amber-500/20' : ''}`}
+                aria-label="Path Track"
+              >
+                <span className="text-sm">Path Track</span>
+              </button>
             </div>
           </div>
           
@@ -169,19 +205,43 @@ const MapPageInner: React.FC<MapPageProps> = ({
               </div>
             ))}
           </div>
-        </div>
-        
-        {/* User Controls - Positioned at top left (full screen) or top right (split screen) */}
-        <div className={`absolute ${selectedFlight ? 'top-4 right-4' : 'top-4 left-4'} z-[1000]`}>
-          <div className="bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-lg p-2 shadow-lg">
-            <button
-              onClick={onShowRecordings}
-              className="px-3 py-1.5 bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/30 transition-all text-xs"
-            >
-              <span className="hidden sm:inline">Show Recordings</span> <span className="sm:hidden">Recordings</span>
-            </button>
+
+          {/* Bottom Playback Controls */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000]">
+            <div className="bg-slate-900/90 backdrop-blur-md border border-amber-400/40 rounded-xl px-4 py-2 shadow-lg flex items-center gap-3">
+              <button
+                onClick={() => setIsPlaying(p => !p)}
+                className="px-3 py-1.5 bg-amber-500/20 text-amber-300 border border-amber-400/30 rounded-lg hover:bg-amber-500/30 transition-all"
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+                disabled={!showPastTrack}
+              >
+                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </button>
+              <button
+                onClick={handleReplay}
+                className="px-3 py-1.5 bg-amber-500/20 text-amber-300 border border-amber-400/30 rounded-lg hover:bg-amber-500/30 transition-all"
+                aria-label="Replay"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+              <div className="text-amber-200 text-xs font-mono">
+                {Math.min(playIndex + 1, positions.length)} / {positions.length}
+              </div>
+              <div className="w-40 h-2 bg-slate-700 rounded overflow-hidden">
+                <div className="h-full bg-amber-400" style={{ width: `${positions.length ? ((Math.min(playIndex + 1, positions.length) / positions.length) * 100) : 0}%` }} />
+              </div>
+              {currentPlaybackPos && (
+                <div className="ml-2 text-amber-200 text-[11px] font-mono whitespace-nowrap">
+                  Lat: {currentPlaybackPos.lat.toFixed(5)}
+                  {" "}| Lng: {currentPlaybackPos.lng.toFixed(5)}
+                  {" "}| Time: {new Date(currentPlaybackPos.timestamp).toLocaleTimeString()}
+                </div>
+              )}
+            </div>
           </div>
         </div>
+        
+        
         
       </div>
     </MapLayerProvider>
