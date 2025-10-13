@@ -1,4 +1,4 @@
-import { httpGet } from '../shared/lib/http';
+import { httpGet, httpPost, httpDelete } from '../shared/lib/http';
 import type { Position } from '../components/PastTrackLayer';
 
 export interface PositionsResponse {
@@ -8,6 +8,26 @@ export interface PositionsResponse {
 
 export async function fetchPositions(flightId: string): Promise<PositionsResponse> {
   return httpGet<PositionsResponse>(`/positions/default?flightId=${encodeURIComponent(flightId)}`);
+}
+
+export async function listRecordedFlightIds(): Promise<{ success: boolean; flightIds: string[] }> {
+  return httpGet<{ success: boolean; flightIds: string[] }>(`/positions/recorded`);
+}
+
+export async function startRecording(flightId: string): Promise<{ success: boolean; message: string; flightId: string }> {
+  return httpPost<{ success: boolean; message: string; flightId: string }>(`/positions/start`, { flightId });
+}
+
+export async function stopRecording(flightId: string): Promise<{ success: boolean; message: string; flightId: string }> {
+  return httpPost<{ success: boolean; message: string; flightId: string }>(`/positions/stop`, { flightId });
+}
+
+export async function addRecordedPosition(payload: { flightId: string; latitude: number; longitude: number; heading?: number; altitude?: number; speed?: number }): Promise<any> {
+  return httpPost<any>(`/positions/add`, payload);
+}
+
+export async function deleteRecordedFlight(flightId: string): Promise<{ success: boolean; deletedCount: number; flightId: string }> {
+  return httpDelete<{ success: boolean; deletedCount: number; flightId: string }>(`/positions/${encodeURIComponent(flightId)}`);
 }
 
 import type { Flight } from '../types/flight';

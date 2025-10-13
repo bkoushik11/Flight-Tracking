@@ -44,16 +44,16 @@ const flightPositionSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// FIFO Stack implementation - keep only last 100 positions
-// STRICT: Only adds position if lat/lng coordinates have changed
+// FIFO Stack implementation - keep only last 5000 positions
+// STRICT: Only adds position if lat/lng coordinates have changed by at least 0.05°
 flightPositionSchema.methods.addPosition = function(lat, lng, heading, altitude, speed) {
   // Check if this is the first position or if coordinates have changed
   const lastPosition = this.positions[this.positions.length - 1];
   
-  // More precise coordinate change detection
+  // Coordinate change detection threshold (degrees)
   const hasPositionChanged = !lastPosition || 
-    Math.abs(lastPosition.latitude - lat) > 0.01 || 
-    Math.abs(lastPosition.longitude - lng) > 0.01;  
+    Math.abs(lastPosition.latitude - lat) > 0.05 || 
+    Math.abs(lastPosition.longitude - lng) > 0.05;  
 
   // CRITICAL: Only proceed if coordinates have actually changed
   if (!hasPositionChanged) {
@@ -80,9 +80,9 @@ flightPositionSchema.methods.addPosition = function(lat, lng, heading, altitude,
   // Add new position to array
   this.positions.push(newPosition);
 
-  // Maintain FIFO - keep only last 100 positions
-  if (this.positions.length > 100) {
-    this.positions = this.positions.slice(-100);
+  // Maintain FIFO - keep only last 5000 positions
+  if (this.positions.length > 5000) {
+    this.positions = this.positions.slice(-5000);
   }
 
   // Update timestamp
@@ -111,7 +111,7 @@ flightPositionSchema.methods.shouldAddPosition = function(lat, lng) {
   
   const latChange = Math.abs(lastPosition.latitude - lat);
   const lngChange = Math.abs(lastPosition.longitude - lng);
-  const hasPositionChanged = latChange > 0.00001 || lngChange > 0.00001;
+  const hasPositionChanged = latChange > 0.05 || lngChange > 0.05;
   
   return {
     shouldAdd: hasPositionChanged,
@@ -119,7 +119,7 @@ flightPositionSchema.methods.shouldAddPosition = function(lat, lng) {
     changes: {
       latitude: latChange,
       longitude: lngChange,
-      threshold: 0.00001
+      threshold: 0.05
     }
   };
 };

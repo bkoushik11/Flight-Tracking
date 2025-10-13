@@ -1,53 +1,72 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { FlightMap } from '../components/FlightMap';
-import { Layers, MapLayerProvider } from '../components/Layers';
+import { MapLayerProvider } from '../components/Layers';
 import { Flight } from '../types/flight';
-import pathTrackData from '../Data/pathtrack.json';
+
 import { Position as PastTrackPosition } from '../components/PastTrackLayer';
-import { fetchPositions } from '../services/flightService';
-import { Play, Pause, RotateCcw, ArrowLeft } from 'lucide-react';
+import { fetchPositions, listRecordedFlightIds, deleteRecordedFlight } from '../services/flightService';
+import { Play, Pause, RotateCcw, ArrowLeft, Trash2 } from 'lucide-react';
 import L from 'leaflet';
 
 interface PathTrackPageProps {
   flights: Flight[];
   onBack: () => void;
-  onLogout: () => void;
 }
 
 const PathTrackPage: React.FC<PathTrackPageProps> = ({ 
   flights, 
-  onBack,
-  onLogout
+  onBack
 }) => {
   const [showPastTrack, setShowPastTrack] = useState<boolean>(true);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playIndex, setPlayIndex] = useState<number>(0);
-  const [positions, setPositions] = useState<PastTrackPosition[]>(() => (pathTrackData as any).positions || []);
+  const [positions, setPositions] = useState<PastTrackPosition[]>([]);
   const [drawnRectangles, setDrawnRectangles] = useState<L.LatLngBounds[]>([]);
-  const defaultFlightId = (pathTrackData as any).flightId || '80163c';
+  const [availableFlightIds, setAvailableFlightIds] = useState<string[]>([]);
+  const [activeFlightId, setActiveFlightId] = useState<string>('');
 
-  // Fetch positions from backend for active flight id with JSON fallback
+  // Load recorded flight ids
+  useEffect(() => {
+    let cancelled = false;
+    const loadIds = async () => {
+      try {
+        const res = await listRecordedFlightIds();
+        if (!cancelled && res?.flightIds) {
+          setAvailableFlightIds(res.flightIds);
+          if (res.flightIds.length > 0) {
+            setActiveFlightId(res.flightIds[0]);
+          }
+        }
+      } catch {}
+    };
+    loadIds();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch positions from backend for active flight id
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetchPositions(defaultFlightId);
+        const res = await fetchPositions(activeFlightId);
         if (!cancelled && Array.isArray(res.positions) && res.positions.length > 0) {
           setPositions(res.positions as PastTrackPosition[]);
           setPlayIndex(0);
           return;
         }
       } catch (e) {
-        // fall back to bundled JSON
+        // ignore
       }
       if (!cancelled) {
-        setPositions(((pathTrackData as any).positions || []) as PastTrackPosition[]);
+        setPositions([]);
         setPlayIndex(0);
       }
     };
-    load();
+    if (activeFlightId) {
+      load();
+    }
     return () => { cancelled = true; };
-  }, [defaultFlightId]);
+  }, [activeFlightId]);
 
   // Simple playback effect advancing through positions
   useEffect(() => {
@@ -85,7 +104,7 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
   }, []);
 
   // Handle mouse move
-  const handleMapMouseMove = useCallback((lat: number, lng: number) => {
+  const handleMapMouseMove = useCallback(() => {
     // No specific action needed for path track page
   }, []);
 
@@ -103,7 +122,7 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
             pastTrack={{ 
               positions, 
               isVisible: showPastTrack, 
-              flightId: (pathTrackData as any).flightId || 'past-track', 
+              flightId: activeFlightId || 'past-track', 
               currentIndex: playIndex 
             }}
             onRectangleDrawn={handleRectangleDrawn}
@@ -116,61 +135,71 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
               className="flex items-center gap-2 px-3 py-2 bg-slate-900/90 backdrop-blur-md border border-slate-600/40 rounded-lg text-slate-300 hover:bg-slate-700/90 transition-all shadow-lg"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="text-sm">Back to Map</span>
             </button>
           </div>
           
           {/* Controls Panel - Top Right */}
           <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-3">
-            {/* Layers Control */}
-            <div className="inline-flex p-0.5 bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-md shadow-lg">
-              <Layers />
-            </div>
             
-            {/* Path Track Toggle */}
-            <div className="bg-slate-900/90 backdrop-blur-md border border-amber-400/40 rounded-lg shadow-lg">
-              <button
-                onClick={() => { setShowPastTrack(!showPastTrack); if (!showPastTrack) { setPlayIndex(0); } }}
-                className={`px-3 py-2 flex items-center gap-2 text-amber-300 hover:bg-amber-500/20 transition-all rounded-lg ${showPastTrack ? 'bg-amber-500/20' : ''}`}
-                aria-label="Path Track"
-              >
-                <span className="text-sm">Path Track</span>
-              </button>
-            </div>
-            
-            {/* Draw Control */}
-            <div className="bg-slate-900/90 backdrop-blur-md border border-blue-400/40 rounded-lg shadow-lg">
-              <div className="px-3 py-2">
-                <div className="text-blue-300 text-sm font-medium mb-2">Draw Tools</div>
-                <div className="flex gap-2">
+            {/* Recorded Flights Selector */}
+            <div className="bg-slate-900/90 backdrop-blur-md border border-emerald-400/40 rounded-lg shadow-lg p-2">
+              <div className="text-emerald-300 text-sm font-medium mb-1">Recorded Flights</div>
+              <div className="flex gap-2 flex-wrap max-w-[240px]">
+                {availableFlightIds.length === 0 && (
+                  <div className="text-slate-400 text-xs">No recordings yet</div>
+                )}
+                {availableFlightIds.map(fid => (
                   <button
-                    onClick={() => {
-                      const map = (window as any).mapInstance;
-                      if (map && map.drawControl) {
-                        map.drawControl._toolbars.draw._modes.rectangle.handler.enable();
-                      }
-                    }}
-                    className="px-2 py-1 bg-blue-500/20 text-blue-300 border border-blue-400/30 rounded text-xs hover:bg-blue-500/30 transition-all"
-                    title="Draw Rectangle"
+                    key={fid}
+                    onClick={() => setActiveFlightId(fid)}
+                    className={`px-2 py-1 text-xs rounded border transition-all ${activeFlightId === fid ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/50' : 'bg-emerald-500/10 text-emerald-300 border-emerald-400/30 hover:bg-emerald-500/20'}`}
+                    title={fid}
                   >
-                    📐 Rectangle
+                    {fid}
                   </button>
-                  <button
-                    onClick={() => {
-                      setDrawnRectangles([]);
-                      const map = (window as any).mapInstance;
-                      if (map && map.drawnLayers) {
-                        map.drawnLayers.clearLayers();
-                      }
-                    }}
-                    className="px-2 py-1 bg-red-500/20 text-red-300 border border-red-400/30 rounded text-xs hover:bg-red-500/30 transition-all"
-                    title="Clear All"
-                  >
-                    🗑️ Clear
-                  </button>
-                </div>
+                ))}
               </div>
             </div>
+            
+            {/* Path Track Toggle and Delete */}
+            <div className="flex flex-col gap-2 items-end">
+              {/* Smaller Path Track button */}
+              <div className="inline-flex p-0.5 bg-slate-900/90 backdrop-blur-md border border-amber-400/40 rounded-md shadow-lg">
+                <button
+                  onClick={() => { setShowPastTrack(!showPastTrack); if (!showPastTrack) { setPlayIndex(0); } }}
+                  className={`px-2 py-1 text-xs text-amber-300 hover:bg-amber-500/20 transition-all rounded ${showPastTrack ? 'bg-amber-500/20' : ''}`}
+                  aria-label="Path Track"
+                >
+                  Path Track
+                </button>
+              </div>
+
+              {/* Larger delete icon in small box, with real delete functionality */}
+              <div className="inline-flex p-1 bg-slate-900/90 backdrop-blur-md border border-red-400/40 rounded-md shadow-lg">
+                <button
+                  onClick={async () => {
+                    if (!activeFlightId) return;
+                    try {
+                      await deleteRecordedFlight(activeFlightId);
+                      // Refresh lists and UI
+                      setPositions([]);
+                      setPlayIndex(0);
+                      const res = await listRecordedFlightIds();
+                      setAvailableFlightIds(res.flightIds || []);
+                      setActiveFlightId(res.flightIds?.[0] || '');
+                    } catch (e) {
+                      console.error('Failed to delete recorded flight', e);
+                    }
+                  }}
+                  className="px-2 py-1 text-sm text-red-300 hover:text-red-200"
+                  aria-label="Delete Flight Path"
+                  title="Delete Flight Path"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            
           </div>
 
           {/* Drawn Rectangles Info */}

@@ -5,6 +5,7 @@ import { LeftPanel } from '../components/LeftPanel';
 import { Flight } from '../types/flight';
 import { INDIAN_AIRPORTS } from '../components/IndianAirports';
 import L from 'leaflet';
+import { addRecordedPosition, startRecording, stopRecording } from '../services/flightService';
 
 interface MapPageProps {
   flights: Flight[];
@@ -33,6 +34,9 @@ const MapPageInner: React.FC<MapPageProps> = ({
   const notificationTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const [drawnRectangles, setDrawnRectangles] = useState<L.LatLngBounds[]>([]);
   const [isDrawingActive, setIsDrawingActive] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const recordingFlightIdRef = useRef<string | null>(null);
+  const recordTimerRef = useRef<number | null>(null);
   // const navigate = useNavigate();
 
   // Backend now sends only 2 flights, so we can use them directly
@@ -133,6 +137,10 @@ const MapPageInner: React.FC<MapPageProps> = ({
       // Clear notification timeouts
       notificationTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
       notificationTimeoutsRef.current.clear();
+      if (recordTimerRef.current) {
+        window.clearInterval(recordTimerRef.current);
+        recordTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -148,6 +156,68 @@ const MapPageInner: React.FC<MapPageProps> = ({
     
     return () => clearTimeout(timer);
   }, [showLeftPanel]);
+  // Recording controls
+  const handleToggleRecording = useCallback(async () => {
+    if (isRecording) {
+      // Stop
+      const fid = recordingFlightIdRef.current;
+      if (fid) {
+        try { await stopRecording(fid); } catch {}
+      }
+      setIsRecording(false);
+      recordingFlightIdRef.current = null;
+      if (recordTimerRef.current) {
+        window.clearInterval(recordTimerRef.current);
+        recordTimerRef.current = null;
+      }
+      return;
+    }
+    // Start: require a selected flight
+    if (!selectedFlight) {
+      // show ephemeral notification
+      const notificationId = `rec-${Date.now()}`;
+      setNotifications(prev => [...prev, { id: notificationId, message: 'Select a flight to start recording', type: 'info' }]);
+      const timeout = setTimeout(() => {
+        setNotifications(prev => prev.filter(n => n.id !== notificationId));
+        notificationTimeoutsRef.current.delete(notificationId);
+      }, 2500);
+      notificationTimeoutsRef.current.set(notificationId, timeout as any);
+      return;
+    }
+    try {
+      await startRecording(selectedFlight.id);
+      setIsRecording(true);
+      recordingFlightIdRef.current = selectedFlight.id;
+      // poll every 3s to append current selected flight position, even if user clicks other flights
+      if (recordTimerRef.current) window.clearInterval(recordTimerRef.current);
+      recordTimerRef.current = window.setInterval(async () => {
+        const fid = recordingFlightIdRef.current;
+        if (!fid) return;
+        // Find latest position for that flight from flights stream
+        const f = flights.find(fl => fl.id === fid);
+        if (!f || !Number.isFinite(f.latitude) || !Number.isFinite(f.longitude)) return;
+        try {
+          await addRecordedPosition({
+            flightId: fid,
+            latitude: f.latitude,
+            longitude: f.longitude,
+            heading: f.heading,
+            altitude: f.altitude,
+            speed: f.speed
+          });
+        } catch {}
+      }, 3000);
+    } catch (e) {
+      // show error
+      const notificationId = `rec-err-${Date.now()}`;
+      setNotifications(prev => [...prev, { id: notificationId, message: 'Failed to start recording', type: 'error' }]);
+      const timeout = setTimeout(() => {
+        setNotifications(prev => prev.filter(n => n.id !== notificationId));
+        notificationTimeoutsRef.current.delete(notificationId);
+      }, 2500);
+      notificationTimeoutsRef.current.set(notificationId, timeout as any);
+    }
+  }, [isRecording, selectedFlight, flights]);
 
 
   // Keep the right map container from remounting by stabilizing props/handlers
@@ -191,14 +261,29 @@ const MapPageInner: React.FC<MapPageProps> = ({
             </button>
           </div>
           
-          {/* Layers Control - Positioned below logout button */}
-          <div className="absolute top-20 right-2 z-[1000]">
+          {/* PathTrack Nav Button */}
+          {onShowPathTrack && (
+            <div className="absolute top-4 right-2 z-[1000] mb-2">
+              <button
+                onClick={onShowPathTrack}
+                className="px-3 py-2 bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-md shadow-lg text-yellow-300 hover:bg-cyan-500/20 transition-all text-sm font-medium"
+                title="Go to Path Track"
+              >
+                Path Track
+              </button>
+            </div>
+          )}
+          
+          {/* Layers Control */}
+          <div className="absolute top-16 right-2 z-[1000]">
             <div className="inline-flex p-0.5 bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-md shadow-lg">
               <Layers />
             </div>
-            
-            {/* Drawing Controls */}
-            <div className="mt-2 bg-slate-900/90 backdrop-blur-md border border-blue-400/40 rounded-lg shadow-md">
+          </div>
+          
+          {/* Drawing Controls */}
+          <div className="absolute top-24 right-2 z-[1000]">
+            <div className="mt-2">
               <div className="px-1 py-1 flex flex-col gap-2">
                 {/* Rectangle Drawing Icon */}
                 <button
@@ -210,10 +295,10 @@ const MapPageInner: React.FC<MapPageProps> = ({
                       setIsDrawingActive(true);
                     }
                   }}
-                  className={`p-2 border rounded transition-all ${
+                  className={`p-2 rounded transition-all ${
                     isDrawingActive 
-                      ? 'bg-blue-500/40 text-blue-200 border-blue-400/60' 
-                      : 'bg-blue-500/20 text-blue-300 border-blue-400/30 hover:bg-blue-500/30'
+                      ? 'bg-blue-500/40 text-blue-200' 
+                      : 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
                   }`}
                   title={isDrawingActive ? "Rectangle drawing active - Click and drag on map" : "Draw Rectangle"}
                 >
@@ -234,7 +319,7 @@ const MapPageInner: React.FC<MapPageProps> = ({
                       map.drawnLayers.clearLayers();
                     }
                   }}
-                  className="p-2 bg-red-500/20 text-red-300 border border-red-400/30 rounded hover:bg-red-500/30 transition-all"
+                  className="p-2 bg-red-500/20 text-red-300 hover:bg-red-500/30 rounded transition-all"
                   title="Clear All"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -243,6 +328,21 @@ const MapPageInner: React.FC<MapPageProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Record Button - Bottom left */}
+          <div className="absolute bottom-4 left-4 z-[1000]">
+            <button
+              onClick={handleToggleRecording}
+              className={`px-3 py-2 rounded-lg shadow-lg text-sm border transition-all ${
+                isRecording
+                  ? 'bg-red-600/80 text-white border-red-400 hover:bg-red-600'
+                  : 'bg-emerald-600/80 text-white border-emerald-400 hover:bg-emerald-600'
+              }`}
+              aria-label={isRecording ? 'Stop Recording' : 'Start Recording'}
+            >
+              {isRecording ? 'Stop' : 'Record'}
+            </button>
           </div>
           
           {/* Latitude and Longitude Display - Positioned at same level as zoom controls */}
