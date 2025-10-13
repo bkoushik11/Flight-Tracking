@@ -35,8 +35,8 @@ export const useFlights = () => {
           heading: typeof flight.heading === 'string' ? Number(flight.heading) : flight.heading
         }))
         // Drop any flights with invalid coordinates
-        .filter(f => Number.isFinite(f.latitude) && Number.isFinite(f.longitude))
-        .filter(f => f.altitude > 1000 && f.speed > 100);
+        .filter(f => Number.isFinite(f.latitude) && Number.isFinite(f.longitude));
+        // Removed strict altitude and speed filtering to show all flights
 
       setFlights(prevFlights => {
         // Use diff-based update instead of full replacement
@@ -109,9 +109,9 @@ export const useFlights = () => {
     // Tolerances tuned to reduce jitter while keeping motion realistic
     const latTolerance = 0.005; // ~5 meters
     const lngTolerance = 0.005; // ~5 meters
-    const altTolerance = 20;      // 20 feet
+    const altTolerance = 10;      // 10 feet
     const speedTolerance = 5;     // 5 knots
-    const headingTolerance = 2;   // 2 degrees
+    const headingTolerance = 1;   // 1 degree
 
     return (
       Math.abs(prevFlight.latitude - nextFlight.latitude) > latTolerance ||
@@ -291,8 +291,6 @@ export const useFlights = () => {
 
     socket.on('flights', (raw: any[]) => {
       try {
-        console.log('✈️ Received flights from backend:', raw.length, 'flights');
-        
         // Map backend flight shape to frontend
         const mapped: Flight[] = raw.map((f: any) => ({
           id: String(f.id),
@@ -309,15 +307,36 @@ export const useFlights = () => {
           path: Array.isArray(f.history) ? f.history.map((h: any) => [Number(h.lat), Number(h.lng)] as [number, number]) : [],
         }));
         
-        
-
-        updateBufferRef.current = mapped;
-        
-        // Apply updates with debounce
-        if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = window.setTimeout(() => {
-          applyBufferedUpdate();
-        }, 700); // Further smooth updates to reduce map churn
+        // Only update if there are actual changes to prevent unnecessary re-renders
+        setFlights(prevFlights => {
+          // Check if data has actually changed
+          if (prevFlights.length !== mapped.length) {
+            return mapped;
+          }
+          
+          // Check for significant changes in flight data
+          const hasChanges = mapped.some((newFlight, index) => {
+            const prevFlight = prevFlights[index];
+            if (!prevFlight) return true;
+            
+            return (
+              Math.abs(newFlight.latitude - prevFlight.latitude) > 0.005 ||
+              Math.abs(newFlight.longitude - prevFlight.longitude) > 0.005 ||
+              Math.abs(newFlight.altitude - prevFlight.altitude) > 10 ||
+              Math.abs(newFlight.speed - prevFlight.speed) > 5 ||
+              Math.abs(newFlight.heading - prevFlight.heading) > 1 ||
+              newFlight.flightNumber !== prevFlight.flightNumber
+            );
+          });
+          
+          if (hasChanges) {
+            setLastUpdate(new Date());
+            return mapped;
+          }
+          
+          // No significant changes, return previous state
+          return prevFlights;
+        });
         
         hasReceivedInitialDataRef.current = true;
       } catch (error) {

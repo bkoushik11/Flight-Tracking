@@ -42,7 +42,7 @@ const MapPageInner: React.FC<MapPageProps> = ({
   const handleMapMouseMove = useCallback((lat: number, lng: number) => {
     // Only update if the position has changed significantly
     setMousePosition(prev => {
-      if (!prev || Math.abs(prev.lat - lat) > 0.0001 || Math.abs(prev.lng - lng) > 0.0001) {
+      if (!prev || Math.abs(prev.lat - lat) > 0.005 || Math.abs(prev.lng - lng) > 0.005) {
         return { lat, lng };
       }
       return prev;

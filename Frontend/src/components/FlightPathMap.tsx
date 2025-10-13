@@ -110,8 +110,8 @@ const FitToSelection: React.FC<{ selectedFlight: any; routePath: [number, number
       
       // Check if position has changed significantly
       if (!lastPositionRef.current || 
-          Math.abs(lastPositionRef.current[0] - currentPos[0]) > 0.0001 || 
-          Math.abs(lastPositionRef.current[1] - currentPos[1]) > 0.0001) {
+          Math.abs(lastPositionRef.current[0] - currentPos[0]) > 0.005 || 
+          Math.abs(lastPositionRef.current[1] - currentPos[1]) > 0.005) {
         
         try {
           // Keep flight centered as it moves
@@ -217,8 +217,8 @@ export const FlightPathMapInner: React.FC<FlightPathMapProps> = ({ selectedFligh
       
       // Only add current position if it's different from the last point in the path
       if (!lastPoint || 
-          Math.abs(lastPoint[0] - currentPos[0]) > 0.0001 || 
-          Math.abs(lastPoint[1] - currentPos[1]) > 0.0001) {
+          Math.abs(lastPoint[0] - currentPos[0]) > 0.005 || 
+          Math.abs(lastPoint[1] - currentPos[1]) > 0.005) {
         path.push(currentPos);
       }
     }

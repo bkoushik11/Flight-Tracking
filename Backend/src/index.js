@@ -56,35 +56,30 @@ const checkAndBroadcastFlightChanges = async () => {
     
     const currentFlights = await flightService.getAllFlights();
     
-    // Always broadcast current flights to keep clients updated
+    // Always update flight histories and broadcast to ensure real-time updates
     console.log(`📤 Sent ${currentFlights.length} flights to client`);
+    
+    // Always update individual flight histories
+    currentFlights.forEach(flight => {
+      const nowTs = Date.now();
+      const position = { lat: flight.lat, lng: flight.lng, alt: flight.altitude, ts: nowTs };
+      if (!flightService.flightHistories.has(flight.id)) {
+        flightService.flightHistories.set(flight.id, []);
+      }
+      const arr = flightService.flightHistories.get(flight.id);
+      arr.push(position);
+      if (arr.length > 500) {
+        arr.splice(0, arr.length - 500);
+      }
+      flight.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
+    });
+    
+    // Always broadcast current flights to keep clients updated
     flightsGateway.broadcastFlightUpdate(currentFlights);
     
-    // Only check for significant changes for detailed processing
-    if (hasFlightDataChanged(previousFlights, currentFlights)) {
-      console.log(`Significant flight data changes detected`);
-      
-      // Update individual flight histories
-      currentFlights.forEach(flight => {
-        const nowTs = Date.now();
-        const position = { lat: flight.lat, lng: flight.lng, alt: flight.altitude, ts: nowTs };
-        if (!flightService.flightHistories.has(flight.id)) {
-          flightService.flightHistories.set(flight.id, []);
-        }
-        const arr = flightService.flightHistories.get(flight.id);
-        arr.push(position);
-        if (arr.length > 500) {
-          arr.splice(0, arr.length - 500);
-        }
-        flight.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
-      });
-      
-      // Update previous flights data
-      previousFlights = currentFlights;
-      console.log(`✅ Broadcasted ${currentFlights.length} flights at:`, new Date().toISOString());
-    } else {
-      console.log('No significant flight data changes detected');
-    }
+    // Update previous flights data
+    previousFlights = currentFlights;
+    console.log(`✅ Broadcasted ${currentFlights.length} flights at:`, new Date().toISOString());
   } catch (error) {
     console.error('Error checking flight changes:', error);
     // Even on error, try to send cached data if available
@@ -114,11 +109,11 @@ const hasFlightDataChanged = (prevFlights, currentFlights) => {
     const prevFlight = prevFlights[index];
     
     // Define more sensitive tolerance levels for significant changes to ensure updates are visible
-    const latTolerance = 0.0005; // ~0.5 meter (even more sensitive)
-    const lngTolerance = 0.0005; // ~0.5 meter (even more sensitive)
-    const altTolerance = 2;         // 2 feet (even more sensitive)
-    const speedTolerance = 5;       // 1 knot (even more sensitive)
-    const headingTolerance = 0.5;   // 0.5 degree (even more sensitive)
+    const latTolerance = 0.005; // ~5 meters
+    const lngTolerance = 0.005; // ~5 meters
+    const altTolerance = 10;         // 10 feet
+    const speedTolerance = 5;       // 5 knots
+    const headingTolerance = 1;   // 1 degree
     
     return (
       Math.abs(currentFlight.lat - prevFlight.lat) > latTolerance ||
@@ -134,14 +129,14 @@ const hasFlightDataChanged = (prevFlights, currentFlights) => {
   return hasChanges;
 };
 
-// Set up periodic flight fetching every 5 minutes to reduce frequency of updates
-console.log('Setting up periodic flight fetching every 5 minutes');
-setInterval(checkAndBroadcastFlightChanges, 15000);
+// Set up periodic flight fetching every 30 seconds (reduced frequency)
+console.log('Setting up periodic flight fetching every 30 seconds');
+setInterval(checkAndBroadcastFlightChanges, 30000);
 
 // Initial fetch - only do this once on startup
 checkAndBroadcastFlightChanges();
 
-console.log('Flight updates will occur every 5 minutes or when data changes');
+console.log('Flight updates will occur every 30 seconds or when data changes');
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
@@ -184,7 +179,7 @@ async function startServer() {
     server.listen(PORT, () => {
       console.log(`Flight Tracker Backend running on http://localhost:${PORT}`);
       console.log(`WebSocket server ready for real-time updates`);
-      console.log(` OpenSky API integration enabled with periodic updates every 5 minutes`);
+      console.log(` OpenSky API integration enabled with periodic updates every 30 seconds`);
       console.log(`Authentication endpoints available at /api/auth`);
     });
     

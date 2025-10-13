@@ -110,7 +110,7 @@ const isFlightNearAirport = (flight: Flight) => {
 };
 
 // Individual Flight Marker Component - memoized to prevent re-renders
-const FlightMarker: React.FC<{ flight: Flight; onClick: (flight: Flight) => void; selectedFlightId?: string }> = ({ flight, onClick, selectedFlightId }) => {
+const FlightMarker: React.FC<{ flight: Flight; onClick: (flight: Flight) => void; selectedFlightId?: string }> = React.memo(({ flight, onClick, selectedFlightId }) => {
   if (!flight.latitude || !flight.longitude) return null;
   
   const { isNear, airport } = isFlightNearAirport(flight);
@@ -119,6 +119,7 @@ const FlightMarker: React.FC<{ flight: Flight; onClick: (flight: Flight) => void
   return (
     <>
       <Marker
+        key={`${flight.id}-${flight.latitude}-${flight.longitude}`}
         position={[flight.latitude, flight.longitude]}
         icon={createAirplaneIcon(flight.heading || 0, isSelected)}
         eventHandlers={{
@@ -136,19 +137,33 @@ const FlightMarker: React.FC<{ flight: Flight; onClick: (flight: Flight) => void
       </Marker>
     </>
   );
-};
+}, (prevProps, nextProps) => {
+  // Only re-render if there are actual changes in flight data
+  const prev = prevProps.flight;
+  const next = nextProps.flight;
+  
+  return (
+    prev.id === next.id &&
+    Math.abs(prev.latitude - next.latitude) < 0.005 &&
+    Math.abs(prev.longitude - next.longitude) < 0.005 &&
+    Math.abs(prev.altitude - next.altitude) < 10 &&
+    Math.abs(prev.speed - next.speed) < 5 &&
+    Math.abs(prev.heading - next.heading) < 1 &&
+    prevProps.selectedFlightId === nextProps.selectedFlightId
+  );
+});
 
 // Separate component for flight markers to allow independent updates
 const FlightMarkers: React.FC<{ 
   flights: Flight[]; 
   onFlightClick: (flight: Flight) => void;
   selectedFlightId?: string;
-}> = ({ flights, onFlightClick, selectedFlightId }) => {
+}> = React.memo(({ flights, onFlightClick, selectedFlightId }) => {
   return (
     <>
       {flights.map(flight => (
         <FlightMarker 
-          key={flight.id} 
+          key={`${flight.id}-${flight.latitude}-${flight.longitude}`} 
           flight={flight} 
           onClick={onFlightClick} 
           selectedFlightId={selectedFlightId}
@@ -156,7 +171,24 @@ const FlightMarkers: React.FC<{
       ))}
     </>
   );
-};
+}, (prevProps, nextProps) => {
+  // Only re-render if there are actual changes in flight data
+  if (prevProps.flights.length !== nextProps.flights.length) return false;
+  
+  return prevProps.flights.every((prevFlight, index) => {
+    const nextFlight = nextProps.flights[index];
+    if (!nextFlight) return false;
+    
+    return (
+      prevFlight.id === nextFlight.id &&
+      Math.abs(prevFlight.latitude - nextFlight.latitude) < 0.005 &&
+      Math.abs(prevFlight.longitude - nextFlight.longitude) < 0.005 &&
+      Math.abs(prevFlight.altitude - nextFlight.altitude) < 10 &&
+      Math.abs(prevFlight.speed - nextFlight.speed) < 5 &&
+      Math.abs(prevFlight.heading - nextFlight.heading) < 1
+    );
+  });
+});
 
 // Main FlightMap component - memoized to prevent re-renders
 const FlightMapInner: React.FC<FlightMapProps> = ({ 

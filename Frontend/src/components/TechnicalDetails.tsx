@@ -99,17 +99,19 @@ export const TechnicalDetails: React.FC<TechnicalDetailsProps> = memo(({ selecte
     </div>
   );
 }, (prevProps, nextProps) => {
-  // Re-render when selectedFlight reference changes or key live fields update
-  const a = prevProps.selectedFlight;
-  const b = nextProps.selectedFlight;
-  if (a === b) return true;
-  if (!a || !b) return false;
+  // Only re-render if there are actual changes in flight data
+  const prev = prevProps.selectedFlight;
+  const next = nextProps.selectedFlight;
+  
+  if (!prev || !next) return prev !== next;
+  
   return (
-    a.id === b.id &&
-    a.altitude === b.altitude &&
-    a.speed === b.speed &&
-    a.heading === b.heading &&
-    a.latitude === b.latitude &&
-    a.longitude === b.longitude
+    prev.id === next.id &&
+    prev.flightNumber === next.flightNumber &&
+    Math.abs((prev.latitude || 0) - (next.latitude || 0)) < 0.005 &&
+    Math.abs((prev.longitude || 0) - (next.longitude || 0)) < 0.005 &&
+    Math.abs((prev.altitude || 0) - (next.altitude || 0)) < 10 &&
+    Math.abs((prev.speed || 0) - (next.speed || 0)) < 5 &&
+    Math.abs((prev.heading || 0) - (next.heading || 0)) < 1
   );
 });

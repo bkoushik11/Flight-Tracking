@@ -58,12 +58,25 @@ function App() {
     navigate('/');
   }, [navigate]);
 
-  // Keep selectedFlight in sync with live updates
+  // Keep selectedFlight in sync with live updates - only update when there are actual changes
   useEffect(() => {
     if (!selectedFlight) return;
     const latest = flights.find(f => f.id === selectedFlight.id);
-    if (latest && latest !== selectedFlight) {
-      setSelectedFlight(latest);
+    if (latest) {
+      // Check if there are significant changes before updating
+      const hasChanges = (
+        Math.abs(latest.latitude - selectedFlight.latitude) > 0.005 ||
+        Math.abs(latest.longitude - selectedFlight.longitude) > 0.005 ||
+        Math.abs(latest.altitude - selectedFlight.altitude) > 10 ||
+        Math.abs(latest.speed - selectedFlight.speed) > 5 ||
+        Math.abs(latest.heading - selectedFlight.heading) > 1 ||
+        latest.flightNumber !== selectedFlight.flightNumber
+      );
+      
+      if (hasChanges) {
+        // Create a new object to ensure React detects changes
+        setSelectedFlight({...latest, lastUpdate: new Date()});
+      }
     }
   }, [flights, selectedFlight]);
 

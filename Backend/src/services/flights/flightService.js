@@ -3,9 +3,9 @@ const { GEOGRAPHIC_BOUNDS, CONFIG } = require("../../utils/constants");
 
 // OpenSky API configuration - using anonymous access only
 const OPENSKY_API_BASE = 'https://opensky-network.org/api/states/all';
-const API_TIMEOUT = 1500000; // 15 seconds
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration
-const MIN_REQUEST_INTERVAL = 15000; // 5 minutes minimum request interval
+const API_TIMEOUT = 15000; // 15 seconds
+const CACHE_DURATION = 30000; // 30 seconds cache duration
+const MIN_REQUEST_INTERVAL = 30000; // 30 seconds minimum request interval
 
 // India geographic boundaries
 const INDIA_BOUNDS = {
@@ -39,7 +39,7 @@ class FlightService {
     try {
       const currentTime = Date.now();
       
-      // Always check cache first - return cached data if the last request was too recent
+      // Check cache first - return cached data if the last request was too recent
       if (currentTime - this.lastFetchTime < MIN_REQUEST_INTERVAL) {
         if (this.flightCache.size > 0) {
           return Array.from(this.flightCache.values());
@@ -243,20 +243,11 @@ class FlightService {
       }
     });
     
-    // Sort by most recent update time and limit to 2 flights
+    // Sort by most recent update time and limit to 5 flights
     const sortedFlights = validFlights.sort((a, b) => b.updatedAt - a.updatedAt);
-    const limitedFlights = sortedFlights.slice(0, 2);
+    const limitedFlights = sortedFlights.slice(0, 5);
     
     console.log(`📊 Filtered ${validFlights.length} valid flights to ${limitedFlights.length} live flights`);
-    if (limitedFlights.length > 0) {
-      console.log('Live flights:', limitedFlights.map(f => ({ 
-        id: f.id, 
-        flightNumber: f.flightNumber, 
-        lat: f.lat, 
-        lng: f.lng,
-        updatedAt: new Date(f.updatedAt).toISOString()
-      })));
-    }
     
     return limitedFlights;
   }
