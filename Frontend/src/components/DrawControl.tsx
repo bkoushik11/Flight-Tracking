@@ -1,119 +1,149 @@
-import React, { useState } from "react";
-import { useMap } from "react-leaflet";
-import { EditControl } from "react-leaflet-draw";
-import L from "leaflet";
-import "leaflet-draw/dist/leaflet.draw.css";
-import { Square, SquareSlash } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet-draw/dist/leaflet.draw.css';
+import 'leaflet-draw';
 
-// Extend the L namespace to include the drawLocal property
-declare module 'leaflet' {
-  namespace Draw {
-    interface MapOptions {
-      drawControlTooltips?: boolean;
-      drawControl?: boolean;
-    }
-  }
+interface DrawControlProps {
+  onRectangleDrawn?: (bounds: L.LatLngBounds) => void;
+  autoZoom?: boolean;
 }
 
-const DrawControl: React.FC = () => {
+const DrawControl: React.FC<DrawControlProps> = ({ onRectangleDrawn, autoZoom = true }) => {
   const map = useMap();
-  const [drawnLayers, setDrawnLayers] = useState<L.LayerGroup | null>(null);
-  const [isDrawingEnabled, setIsDrawingEnabled] = useState(false);
+  const drawControlRef = useRef<L.Control.Draw | null>(null);
+  const drawnLayersRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
+  const rectangleHandlerRef = useRef<any>(null);
 
-  // Initialize the layer group for drawn items
-  React.useEffect(() => {
-    const layerGroup = new L.LayerGroup();
-    layerGroup.addTo(map);
-    setDrawnLayers(layerGroup);
-    
-    return () => {
-      layerGroup.clearLayers();
-      layerGroup.removeFrom(map);
-    };
-  }, [map]);
+  useEffect(() => {
+    if (!map) return;
 
-  // When user creates a rectangle
-  const onCreated = (e: any) => {
-    const layer = e.layer;
-    if (drawnLayers) {
-      // Add the new layer to our layer group
-      drawnLayers.addLayer(layer);
-      
-      // If it's a rectangle or polygon, zoom to its bounds
-      if (layer.getBounds) {
-        const bounds = layer.getBounds();
-        map.fitBounds(bounds);
+    // Create feature group for drawn items
+    map.addLayer(drawnLayersRef.current);
+
+    // Initialize the draw control with all drawing tools disabled except rectangle
+    const drawControl = new L.Control.Draw({
+      position: 'topright',
+      draw: {
+        polygon: false,
+        polyline: false,
+        circle: false,
+        marker: false,
+        circlemarker: false,
+        rectangle: {
+          shapeOptions: {
+            color: '#3b82f6',
+            weight: 3,
+            opacity: 0.8,
+            fillOpacity: 0.2,
+            dashArray: '5, 5'
+          },
+          repeatMode: false
+        }
+      },
+      edit: {
+        featureGroup: drawnLayersRef.current,
+        remove: true
       }
+    });
+
+    drawControlRef.current = drawControl;
+    map.addControl(drawControlRef.current);
+
+    // Hide default control UI since we're using custom buttons
+    const drawControlElement = drawControlRef.current.getContainer();
+    if (drawControlElement) {
+      drawControlElement.style.display = 'none';
     }
-  };
 
-  // Clear all drawn layers
-  const clearDrawings = () => {
-    if (drawnLayers) {
-      drawnLayers.clearLayers();
-    }
-  };
+    // Make map instance and drawing functions available globally
+    (window as any).mapInstance = map;
+    (window as any).mapInstance.drawnLayers = drawnLayersRef.current;
 
-  // Toggle drawing mode
-  const toggleDrawing = () => {
-    setIsDrawingEnabled(!isDrawingEnabled);
-    if (!isDrawingEnabled) {
-      clearDrawings();
-    }
-  };
+    // Function to enable rectangle drawing
+    (window as any).mapInstance.enableRectangleDrawing = () => {
+      // Disable any existing drawing mode
+      if (rectangleHandlerRef.current) {
+        rectangleHandlerRef.current.disable();
+      }
 
-  return (
-    <>
-      {/* Drawing Control Button */}
-      <div className="leaflet-top leaflet-right" style={{ position: 'relative', zIndex: 1001 }}>
-        <div className="leaflet-control leaflet-bar bg-white rounded-lg shadow-lg">
-          <button
-            onClick={toggleDrawing}
-            className={`p-2 ${isDrawingEnabled ? 'bg-cyan-500 text-white' : 'bg-white text-gray-700'} hover:bg-cyan-100 transition-all rounded-lg`}
-            aria-label={isDrawingEnabled ? "Disable drawing" : "Enable drawing"}
-          >
-            {isDrawingEnabled ? (
-              <SquareSlash className="h-5 w-5" />
-            ) : (
-              <Square className="h-5 w-5" />
-            )}
-          </button>
-          
-          {isDrawingEnabled && (
-            <button
-              onClick={clearDrawings}
-              className="p-2 bg-white text-gray-700 hover:bg-red-100 transition-all rounded-lg mt-1"
-              aria-label="Clear drawings"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </button>
-          )}
-        </div>
-      </div>
+      // Create new rectangle handler using the proper Leaflet Draw API
+      // Cast map to any to avoid type issues with Leaflet Draw
+      rectangleHandlerRef.current = new (L.Draw as any).Rectangle(map as any, {
+        shapeOptions: {
+          color: '#3b82f6',
+          weight: 3,
+          opacity: 0.8,
+          fillOpacity: 0.2,
+          dashArray: '5, 5'
+        },
+        showArea: false,
+        metric: true
+      });
 
-      {/* Edit Control - only shown when drawing is enabled */}
-      {isDrawingEnabled && drawnLayers && (
-        <EditControl
-          position="topright"
-          onCreated={onCreated}
-          draw={{
-            rectangle: true,
-            polygon: true,
-            circle: false,
-            polyline: false,
-            marker: false,
-            circlemarker: false,
-          }}
-          edit={{
-            featureGroup: drawnLayers,
-            remove: true,
-          }}
-        />
-      )}
-    </>
-  );
+      // Enable the drawing mode
+      rectangleHandlerRef.current.enable();
+      console.log('Rectangle drawing enabled');
+    };
+
+    // Function to disable rectangle drawing
+    (window as any).mapInstance.disableRectangleDrawing = () => {
+      if (rectangleHandlerRef.current) {
+        rectangleHandlerRef.current.disable();
+        rectangleHandlerRef.current = null;
+        console.log('Rectangle drawing disabled');
+      }
+    };
+
+    // Event handler for when a shape is created
+    const handleDrawCreated = (e: any) => {
+      const layer = e.layer;
+      drawnLayersRef.current.addLayer(layer);
+
+      // Get bounds for rectangles
+      const bounds = layer.getBounds();
+
+      // Auto zoom to drawn area if enabled
+      if (autoZoom) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+
+      // Call the callback if provided
+      onRectangleDrawn?.(bounds);
+    };
+
+    // Event handler for when shapes are deleted
+    const handleDrawDeleted = () => {
+      // Reset view if all layers are deleted
+      if (drawnLayersRef.current.getLayers().length === 0) {
+        map.setView([20.5937, 78.9629], 5);
+      }
+    };
+
+    // Attach event listeners
+    map.on((L.Draw as any).Event.CREATED, handleDrawCreated);
+    map.on((L.Draw as any).Event.DELETED, handleDrawDeleted);
+
+    // Cleanup function
+    return () => {
+      // Disable drawing if active
+      if (rectangleHandlerRef.current) {
+        rectangleHandlerRef.current.disable();
+      }
+
+      // Remove event listeners
+      map.off((L.Draw as any).Event.CREATED, handleDrawCreated);
+      map.off((L.Draw as any).Event.DELETED, handleDrawDeleted);
+
+      // Remove control and layers
+      if (drawControlRef.current) {
+        map.removeControl(drawControlRef.current);
+      }
+      map.removeLayer(drawnLayersRef.current);
+    };
+  }, [map, onRectangleDrawn, autoZoom]);
+
+  return null;
 };
 
 export default DrawControl;

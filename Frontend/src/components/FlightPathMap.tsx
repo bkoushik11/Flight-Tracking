@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, memo, useState } from 'react';
+import React, { useRef, useEffect, useMemo, memo } from 'react';
 import { MapContainer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -197,10 +197,34 @@ const createGeneralAirportIcon = (airportName: string) => {
 // Default center is handled by getInitialView fallback
 
 export const FlightPathMapInner: React.FC<FlightPathMapProps> = ({ selectedFlight, onPathClick }) => {
-  const [routePath, setRoutePath] = useState<[number, number][]>([]);
   const { activeLayer } = useMapLayer();
 
   const initialView = useMemo(() => getInitialView(), []);
+
+  // Generate route path from selected flight's path data
+  const routePath = useMemo(() => {
+    if (!selectedFlight?.path || !Array.isArray(selectedFlight.path)) {
+      return [];
+    }
+    
+    // Convert flight path to coordinates array
+    const path = selectedFlight.path.map((point: [number, number]) => point);
+    
+    // Add current position if it's not already in the path
+    if (selectedFlight.latitude && selectedFlight.longitude) {
+      const currentPos: [number, number] = [selectedFlight.latitude, selectedFlight.longitude];
+      const lastPoint = path[path.length - 1];
+      
+      // Only add current position if it's different from the last point in the path
+      if (!lastPoint || 
+          Math.abs(lastPoint[0] - currentPos[0]) > 0.0001 || 
+          Math.abs(lastPoint[1] - currentPos[1]) > 0.0001) {
+        path.push(currentPos);
+      }
+    }
+    
+    return path;
+  }, [selectedFlight?.path, selectedFlight?.latitude, selectedFlight?.longitude]);
 
   return (
     <MapContainer
@@ -208,6 +232,7 @@ export const FlightPathMapInner: React.FC<FlightPathMapProps> = ({ selectedFligh
       zoom={initialView.zoom}
       style={{ height: '100%', width: '100%' }}
       attributionControl={false}
+      zoomControl={false}
     >
       <MapEvents onClick={onPathClick} />
       <ActiveTileLayer key={activeLayer.id} />

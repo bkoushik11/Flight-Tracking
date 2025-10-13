@@ -35,7 +35,8 @@ export const useFlights = () => {
           heading: typeof flight.heading === 'string' ? Number(flight.heading) : flight.heading
         }))
         // Drop any flights with invalid coordinates
-        .filter(f => Number.isFinite(f.latitude) && Number.isFinite(f.longitude));
+        .filter(f => Number.isFinite(f.latitude) && Number.isFinite(f.longitude))
+        .filter(f => f.altitude > 1000 && f.speed > 100);
 
       setFlights(prevFlights => {
         // Use diff-based update instead of full replacement
@@ -106,8 +107,8 @@ export const useFlights = () => {
   // Function to check if flight data has significant changes
   const hasSignificantChanges = useCallback((prevFlight: Flight, nextFlight: Flight) => {
     // Tolerances tuned to reduce jitter while keeping motion realistic
-    const latTolerance = 0.00005; // ~5 meters
-    const lngTolerance = 0.00005; // ~5 meters
+    const latTolerance = 0.005; // ~5 meters
+    const lngTolerance = 0.005; // ~5 meters
     const altTolerance = 20;      // 20 feet
     const speedTolerance = 5;     // 5 knots
     const headingTolerance = 2;   // 2 degrees
@@ -199,13 +200,13 @@ export const useFlights = () => {
           if (hasChanges) {
             const updatedFlightsMap = new Map(updatedFlights.map(f => [f.id, f]));
             previousFlightsRef.current = updatedFlightsMap;
-            console.log('🔄 Updating flights with significant changes');
+    
             setLastUpdate(new Date());
             return updatedFlights;
           }
           
           // No significant changes, return previous state to prevent re-render
-          console.log('⏭️ Skipping update - no significant changes detected');
+          
           return prevFlights;
         });
       }
@@ -301,7 +302,6 @@ export const useFlights = () => {
           altitude: Number(f.altitude ?? 0),
           speed: Number(f.speed ?? 0),
           heading: Number(f.heading ?? 0),
-          status: String(f.status || 'on-time') as any,
           aircraft: String(f.aircraft || 'Unknown'),
           origin: String(f.origin || 'N/A'),
           destination: String(f.destination || 'N/A'),
@@ -309,7 +309,7 @@ export const useFlights = () => {
           path: Array.isArray(f.history) ? f.history.map((h: any) => [Number(h.lat), Number(h.lng)] as [number, number]) : [],
         }));
         
-        console.log('✅ Mapped flights:', mapped.length, 'valid flights');
+        
 
         updateBufferRef.current = mapped;
         

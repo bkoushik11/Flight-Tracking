@@ -1,4 +1,15 @@
 import { httpGet } from '../shared/lib/http';
+import type { Position } from '../components/PastTrackLayer';
+
+export interface PositionsResponse {
+  flightId: string;
+  positions: Position[];
+}
+
+export async function fetchPositions(flightId: string): Promise<PositionsResponse> {
+  return httpGet<PositionsResponse>(`/positions/default?flightId=${encodeURIComponent(flightId)}`);
+}
+
 import type { Flight } from '../types/flight';
 
 export interface FlightApiResponse {
@@ -114,7 +125,6 @@ export class FlightService {
       // Fetch from API
       const refreshQuery = opts?.refresh ? '?refresh=1' : '';
       const f = await httpGet<any>(`/flights/${id}${refreshQuery}`);
-      const status = String(f.status || 'on-time').replace(' ', '-');
       const path = Array.isArray(f.history)
         ? f.history.map((h: any) => [Number(h.lat), Number(h.lng)] as [number, number])
         : [];

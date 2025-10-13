@@ -2,6 +2,7 @@ const express = require("express");
 const flightsRoutes = require("./flights.routes");
 const authRoutes = require("./auth");
 const recordingsRoutes = require("./recordings.routes");
+const positionsRoutes = require("./positions.routes");
 
 const router = express.Router();
 
@@ -9,6 +10,7 @@ const router = express.Router();
 router.use("/flights", flightsRoutes);
 router.use("/auth", authRoutes);
 router.use("/recordings", recordingsRoutes);
+router.use("/positions", positionsRoutes);
 
 // Root endpoint
 router.get("/", (req, res) => {

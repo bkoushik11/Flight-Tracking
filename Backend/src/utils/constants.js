@@ -8,7 +8,7 @@ const FLIGHT_STATUSES = {
 
 // Flight simulation constants
 const FLIGHT_SIMULATION = {
-  DEFAULT_COUNT: 40,
+  DEFAULT_COUNT: 2, // Limited to 2 live flights
   DEFAULT_TICK_MS: 3000,
   MAX_HISTORY_LENGTH: 50,
   POSITION_CHANGE_RANGE: 0.08,
@@ -63,6 +63,6 @@ module.exports = {
     PORT: Number(process.env.PORT) || 5000,
     TICK_MS: Number(process.env.TICK_MS) || 30000, // Changed to 30 seconds to reduce refresh frequency
     CORS_ORIGIN: process.env.CORS_ORIGIN || "*",
-    FLIGHT_COUNT: Number(process.env.FLIGHT_COUNT) || Number.MAX_SAFE_INTEGER // Set to maximum for unlimited flights
+    FLIGHT_COUNT: Number(process.env.FLIGHT_COUNT) || 2 // Limited to 2 live flights
   }
 };

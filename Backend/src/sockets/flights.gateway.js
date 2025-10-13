@@ -25,7 +25,7 @@ class FlightsGateway {
     
     this.connectedClients.set(socket.id, clientInfo);
 
-    console.log(`✅ Client connected: ${socket.id}`);
+    console.log(`Client connected: ${socket.id}`);
 
     // Send current flights immediately on connect
     this.sendCurrentFlights(socket);
@@ -43,7 +43,7 @@ class FlightsGateway {
   handleDisconnection(socket) {
     this.connectedClients.delete(socket.id);
     this.clientRequestTimes.delete(socket.id);
-    console.log(`❌ Client disconnected: ${socket.id}`);
+    console.log(`Client disconnected: ${socket.id}`);
   }
 
   async handleFlightRequest(socket) {
@@ -53,7 +53,7 @@ class FlightsGateway {
     if (clientInfo) {
       if (now - clientInfo.lastRequestTime < 120000) {
         const secondsRemaining = Math.ceil((120000 - (now - clientInfo.lastRequestTime)) / 1000);
-        console.log(`⏭️ Client ${socket.id} requesting too frequently (${secondsRemaining}s left)`);
+        console.log(`Client ${socket.id} requesting too frequently (${secondsRemaining}s left)`);
         socket.emit("error", { 
           message: `Please wait ${secondsRemaining} seconds before requesting flights again` 
         });
@@ -63,7 +63,7 @@ class FlightsGateway {
       this.updateClientActivity(socket.id);
     }
     
-    console.log(`📥 Client ${socket.id} requested flights`);
+    console.log(`Client ${socket.id} requested flights`);
     await this.sendCurrentFlights(socket);
   }
 
@@ -85,7 +85,7 @@ class FlightsGateway {
     if (clientInfo) {
       if (now - clientInfo.lastRequestTime < 120000) {
         const secondsRemaining = Math.ceil((120000 - (now - clientInfo.lastRequestTime)) / 1000);
-        console.log(`⏭️ Client ${socket.id} requesting refresh too frequently (${secondsRemaining}s left)`);
+        console.log(`Client ${socket.id} requesting refresh too frequently (${secondsRemaining}s left)`);
         socket.emit("error", { 
           message: `Please wait ${secondsRemaining} seconds before refreshing flights` 
         });
@@ -95,7 +95,7 @@ class FlightsGateway {
       this.updateClientActivity(socket.id);
     }
     
-    console.log(`🔄 Client ${socket.id} requested flight refresh`);
+    console.log(`Client ${socket.id} requested flight refresh`);
     await this.sendCurrentFlights(socket);
   }
 
@@ -114,7 +114,7 @@ class FlightsGateway {
     }
 
     try {
-      console.log(`📥 Client ${socket.id} subscribed to flight ${id}`);
+      console.log(`Client ${socket.id} subscribed to flight ${id}`);
       const flights = await flightService.getAllFlights();
       const flight = flights.find(f => f.id === id) || null;
       
@@ -132,9 +132,9 @@ class FlightsGateway {
         flight.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
         
         socket.emit("flight", flight);
-        console.log(`📤 Sent initial flight data for ${id} to client ${socket.id}`);
+        console.log(`Sent initial flight data for ${id} to client ${socket.id}`);
       } else {
-        console.log(`⚠️ Flight ${id} not found for client ${socket.id}`);
+        console.log(`Flight ${id} not found for client ${socket.id}`);
         socket.emit("error", { message: `Flight ${id} not found` });
       }
     } catch (error) {
@@ -153,7 +153,7 @@ class FlightsGateway {
     if (clientInfo) {
       clientInfo.subscribedFlights.delete(id);
     }
-    console.log(`🚪 Client ${socket.id} unsubscribed from flight ${id}`);
+    console.log(`Client ${socket.id} unsubscribed from flight ${id}`);
   }
 
   handlePing(socket) {
@@ -261,7 +261,7 @@ class FlightsGateway {
     });
 
     if (inactiveClients.length > 0) {
-      console.log(`🧹 Cleaned up ${inactiveClients.length} inactive clients`);
+      console.log(`Cleaned up ${inactiveClients.length} inactive clients`);
     }
   }
 }

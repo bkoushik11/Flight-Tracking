@@ -35,7 +35,7 @@ export const MapZoomControls: React.FC = () => {
   };
 
   return (
-    <div className="absolute bottom-4 right-4 z-[1000]">
+    <div className="absolute bottom-20 right-4 z-[1000]">
       {/* Container with background to group all controls */}
       <div className="bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-lg p-1 shadow-lg flex flex-col gap-1">
         <button

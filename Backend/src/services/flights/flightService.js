@@ -3,9 +3,9 @@ const { GEOGRAPHIC_BOUNDS, CONFIG } = require("../../utils/constants");
 
 // OpenSky API configuration - using anonymous access only
 const OPENSKY_API_BASE = 'https://opensky-network.org/api/states/all';
-const API_TIMEOUT = 15000; // 15 seconds
+const API_TIMEOUT = 1500000; // 15 seconds
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration
-const MIN_REQUEST_INTERVAL = 5 * 60 * 1000; // 5 minutes minimum request interval
+const MIN_REQUEST_INTERVAL = 15000; // 5 minutes minimum request interval
 
 // India geographic boundaries
 const INDIA_BOUNDS = {
@@ -29,12 +29,10 @@ class FlightService {
     this.cacheDuration = CACHE_DURATION;
     this.rateLimitBackoff = 0; // Track rate limit backoff
     
-    console.log('🌐 Using OpenSky API with anonymous access');
-    console.log('   Rate limit: 400 requests/day, 5-minute intervals');
-    console.log('🇮🇳 Configured for India flights only');
-    console.log(`   Latitude: ${INDIA_BOUNDS.lamin}° to ${INDIA_BOUNDS.lamax}°`);
-    console.log(`   Longitude: ${INDIA_BOUNDS.lomin}° to ${INDIA_BOUNDS.lomax}°`);
-    console.log(`   Maximum flights: ${CONFIG.FLIGHT_COUNT}`);
+    
+    console.log(`Latitude: ${INDIA_BOUNDS.lamin}° to ${INDIA_BOUNDS.lamax}°`);
+    console.log(`Longitude: ${INDIA_BOUNDS.lomin}° to ${INDIA_BOUNDS.lomax}°`);
+    console.log(`Maximum flights: ${CONFIG.FLIGHT_COUNT} (limited to 2 live flights)`);
   }
 
   async getAllFlights() {
@@ -63,7 +61,7 @@ class FlightService {
         return Array.from(this.flightCache.values());
       }
 
-      console.log('📡 Fetching real flight data from OpenSky API...');
+    
       const flights = await this._fetchFromOpenSkyAPI();
 
       // Update rolling histories per flight and stamp history onto objects
@@ -93,12 +91,12 @@ class FlightService {
       
       this._updateStats(currentTime);
       if (flights.length > 0) {
-        console.log(`✅ Fetched and processed ${flights.length} flights from OpenSky API`);
+        console.log(`Fetched and processed ${flights.length} flights from OpenSky API`);
       }
       return flights;
       
     } catch (error) {
-      console.error("💥 Error in getAllFlights:", error.message);
+      console.error("Error in getAllFlights:", error.message);
       
       // Handle rate limiting with exponential backoff
       if (error.message.includes('rate limit') || error.response?.status === 429) {
@@ -106,7 +104,7 @@ class FlightService {
         
         // Set initial backoff to 5 minutes
         this.rateLimitBackoff = currentTime + (5 * 60 * 1000);
-        console.log(`⏰ Rate limited. Backing off for 5 minutes until ${new Date(this.rateLimitBackoff).toLocaleTimeString()}`);
+        console.log(`Rate limited. Backing off for 5 minutes until ${new Date(this.rateLimitBackoff).toLocaleTimeString()}`);
       }
       
       // Return cached data if available during errors, even if it's stale
@@ -137,7 +135,7 @@ class FlightService {
     };
 
     try {
-      console.log('📡 Making anonymous request to OpenSky API...');
+      console.log('Making anonymous request to OpenSky API...');
       const response = await axios.get(url, config);
 
       if (!response.data?.states) {
@@ -150,7 +148,7 @@ class FlightService {
       return flights;
 
     } catch (error) {
-      console.error("💥 Error fetching from OpenSky API:", error.message);
+      console.error("Error fetching from OpenSky API:", error.message);
       
       // Log additional details for debugging
       if (error.response) {
@@ -181,7 +179,7 @@ class FlightService {
         const [
           icao24, callsign, origin_country, time_position, last_contact,
           longitude, latitude, baro_altitude, on_ground, velocity,
-          true_track, vertical_rate, sensors, geo_altitude, squawk, spi, position_source
+          true_track,geo_altitude
         ] = state;
         
         // Skip aircraft without valid position data or on ground
@@ -216,13 +214,13 @@ class FlightService {
         // Clean callsign
         const flightNumber = callsign ? callsign.trim() : `FL${icao24.slice(-4).toUpperCase()}`;
         
-        // Determine status based on speed and altitude
-        let status = 'on-time';
-        if (speed < 50 && alt < 1000) {
-          status = 'boarding';
-        } else if (speed < 100) {
-          status = 'delayed';
-        }
+        // // Determine status based on speed and altitude
+        // let status = 'on-time';
+        // if (speed < 50 && alt < 10000) {
+        //   status = 'boarding';
+        // } else if (speed < 200) {
+        //   status = 'delayed';
+        // }
         
         validFlights.push({
           id: icao24,
@@ -232,7 +230,6 @@ class FlightService {
           altitude: Math.max(0, alt * 3.28084), // Convert meters to feet
           speed: Math.max(0, speed),
           heading: heading,
-          status: status,
           aircraft: 'Unknown', // OpenSky doesn't provide aircraft type in basic API
           origin: origin_country || 'Unknown',
           destination: 'Unknown', // Would need additional API calls
@@ -242,11 +239,26 @@ class FlightService {
         
       } catch (error) {
         // Skip invalid entries silently
-        console.warn(`⚠️  Skipping invalid flight data at index ${index}:`, error.message);
+        console.warn(`Skipping invalid flight data at index ${index}:`, error.message);
       }
     });
     
-    return validFlights;
+    // Sort by most recent update time and limit to 2 flights
+    const sortedFlights = validFlights.sort((a, b) => b.updatedAt - a.updatedAt);
+    const limitedFlights = sortedFlights.slice(0, 2);
+    
+    console.log(`📊 Filtered ${validFlights.length} valid flights to ${limitedFlights.length} live flights`);
+    if (limitedFlights.length > 0) {
+      console.log('Live flights:', limitedFlights.map(f => ({ 
+        id: f.id, 
+        flightNumber: f.flightNumber, 
+        lat: f.lat, 
+        lng: f.lng,
+        updatedAt: new Date(f.updatedAt).toISOString()
+      })));
+    }
+    
+    return limitedFlights;
   }
 
   async getFlight(id) {
@@ -282,7 +294,7 @@ class FlightService {
       
       return flight;
     } catch (error) {
-      console.error(`💥 Error getting flight ${id}:`, error);
+      console.error(`Error getting flight ${id}:`, error);
       return null;
     }
   }
@@ -293,26 +305,26 @@ class FlightService {
 
   async resetFlights() {
     try {
-      console.log("🔄 Clearing flight cache and forcing fresh OpenSky API fetch");
+      console.log("Clearing flight cache and forcing fresh OpenSky API fetch");
       this.flightCache.clear();
       this.lastFetchTime = 0;
       this.rateLimitBackoff = 0;
       return await this.getAllFlights();
     } catch (error) {
-      console.error("💥 Error resetting flights:", error);
+      console.error("Error resetting flights:", error);
       throw error;
     }
   }
 
   // Add a method to manually clear rate limit backoff
   clearRateLimitBackoff() {
-    console.log("🔄 Manually clearing rate limit backoff");
+    console.log("Manually clearing rate limit backoff");
     this.rateLimitBackoff = 0;
   }
 
   // Add a method to force refresh flights
   async forceRefreshFlights() {
-    console.log("🔄 Force refreshing flights - clearing cache and backoff");
+    console.log("Force refreshing flights - clearing cache and backoff");
     this.flightCache.clear();
     this.lastFetchTime = 0;
     this.rateLimitBackoff = 0;
@@ -338,7 +350,7 @@ class FlightService {
     try {
       return this.flightCache.size;
     } catch (error) {
-      console.error("💥 Error getting flight count:", error);
+      console.error("Error getting flight count:", error);
       return 0;
     }
   }

@@ -9,6 +9,8 @@ import { ActiveTileLayer, useMapLayer } from './Layers';
 import IndiaBorders from './IndiaBorders';
 import StateBorders from './StateBorders';
 import PastTrackLayer, { Position as PastTrackPosition } from './PastTrackLayer';
+import DrawControl from './DrawControl';
+import CentreFlight from './CentreFlight';
 
 // Fix for default marker icons in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -25,6 +27,9 @@ interface FlightMapProps {
   onMouseMove?: (lat: number, lng: number) => void;
   selectedFlight: Flight | null;
   pastTrack?: { positions: PastTrackPosition[]; isVisible: boolean; flightId: string; currentIndex?: number };
+  onRectangleDrawn?: (bounds: L.LatLngBounds) => void;
+  showLeftPanel?: boolean;
+  onBackToMap?: () => void;
 }
 
 // Component to handle map events
@@ -88,8 +93,6 @@ const createAirplaneIcon = (heading: number, isSelected?: boolean) => {
     iconAnchor: [12, 12],
   });
 };
-
-//
 
 // Check if flight is near an airport
 const isFlightNearAirport = (flight: Flight) => {
@@ -162,7 +165,10 @@ const FlightMapInner: React.FC<FlightMapProps> = ({
   onMapClick,
   onMouseMove,
   selectedFlight,
-  pastTrack
+  pastTrack,
+  onRectangleDrawn,
+  showLeftPanel,
+  onBackToMap
 }) => {
   const { activeLayer } = useMapLayer();
   
@@ -192,6 +198,13 @@ const FlightMapInner: React.FC<FlightMapProps> = ({
         />
       )}
       <FlightMarkers flights={flights} onFlightClick={onFlightClick} selectedFlightId={selectedFlight?.id} />
+      <CentreFlight 
+        selectedFlight={selectedFlight} 
+        isActive={!!selectedFlight} 
+        showLeftPanel={showLeftPanel}
+        onBackToMap={onBackToMap}
+      />
+      <DrawControl onRectangleDrawn={onRectangleDrawn} autoZoom={true} />
     </MapContainer>
   );
 };

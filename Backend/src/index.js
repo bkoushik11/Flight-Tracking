@@ -25,30 +25,30 @@ let isCheckingForChanges = false;
 const checkAndBroadcastFlightChanges = async () => {
   // Prevent multiple concurrent checks
   if (isCheckingForChanges) {
-    console.log('⏭️ Skipping check - already checking for changes');
+    console.log('Skipping check - already checking for changes');
     return;
   }
   
   isCheckingForChanges = true;
   
   try {
-    console.log('🔄 Checking for flight changes at:', new Date().toISOString());
+    console.log('Checking for flight changes at:', new Date().toISOString());
     
     // Check if we're in rate limit backoff period
     const currentTime = Date.now();
     const rateLimitBackoff = flightService.rateLimitBackoff;
     if (rateLimitBackoff > currentTime) {
       const backoffMinutes = Math.ceil((rateLimitBackoff - currentTime) / (60 * 1000));
-      console.log(`⏭️ Rate limit backoff active for ${backoffMinutes} more minutes until ${new Date(rateLimitBackoff).toLocaleTimeString()}`);
+      console.log(`Rate limit backoff active for ${backoffMinutes} more minutes until ${new Date(rateLimitBackoff).toLocaleTimeString()}`);
       // Check if we have cached data to send
       const cachedCount = flightService.getFlightCount();
       if (cachedCount > 0) {
-        console.log(`📦 Sending ${cachedCount} cached flights to clients during backoff`);
+        console.log(`Sending ${cachedCount} cached flights to clients during backoff`);
         const cachedFlights = Array.from(flightService.flightCache.values());
         flightsGateway.broadcastFlightUpdate(cachedFlights);
         return;
       } else {
-        console.log('📭 No cached flight data available during backoff period');
+        console.log('No cached flight data available during backoff period');
         flightsGateway.broadcastFlightUpdate([]);
         return;
       }
@@ -57,12 +57,12 @@ const checkAndBroadcastFlightChanges = async () => {
     const currentFlights = await flightService.getAllFlights();
     
     // Always broadcast current flights to keep clients updated
-    console.log(`📡 Broadcasting ${currentFlights.length} flights to clients`);
+    console.log(`📤 Sent ${currentFlights.length} flights to client`);
     flightsGateway.broadcastFlightUpdate(currentFlights);
     
     // Only check for significant changes for detailed processing
     if (hasFlightDataChanged(previousFlights, currentFlights)) {
-      console.log(`🔄 Significant flight data changes detected`);
+      console.log(`Significant flight data changes detected`);
       
       // Update individual flight histories
       currentFlights.forEach(flight => {
@@ -83,18 +83,18 @@ const checkAndBroadcastFlightChanges = async () => {
       previousFlights = currentFlights;
       console.log(`✅ Broadcasted ${currentFlights.length} flights at:`, new Date().toISOString());
     } else {
-      console.log('⏭️ No significant flight data changes detected');
+      console.log('No significant flight data changes detected');
     }
   } catch (error) {
-    console.error('💥 Error checking flight changes:', error);
+    console.error('Error checking flight changes:', error);
     // Even on error, try to send cached data if available
     const cachedCount = flightService.getFlightCount();
     if (cachedCount > 0) {
-      console.log(`📦 Sending ${cachedCount} cached flights due to error`);
+      console.log(`Sending ${cachedCount} cached flights due to error`);
       const cachedFlights = Array.from(flightService.flightCache.values());
       flightsGateway.broadcastFlightUpdate(cachedFlights);
     } else {
-      console.log('📭 No flight data available, sending empty array to clients');
+      console.log('No flight data available, sending empty array to clients');
       flightsGateway.broadcastFlightUpdate([]);
     }
   } finally {
@@ -114,10 +114,10 @@ const hasFlightDataChanged = (prevFlights, currentFlights) => {
     const prevFlight = prevFlights[index];
     
     // Define more sensitive tolerance levels for significant changes to ensure updates are visible
-    const latTolerance = 0.000005; // ~0.5 meter (even more sensitive)
-    const lngTolerance = 0.000005; // ~0.5 meter (even more sensitive)
+    const latTolerance = 0.0005; // ~0.5 meter (even more sensitive)
+    const lngTolerance = 0.0005; // ~0.5 meter (even more sensitive)
     const altTolerance = 2;         // 2 feet (even more sensitive)
-    const speedTolerance = 1;       // 1 knot (even more sensitive)
+    const speedTolerance = 5;       // 1 knot (even more sensitive)
     const headingTolerance = 0.5;   // 0.5 degree (even more sensitive)
     
     return (
@@ -135,13 +135,13 @@ const hasFlightDataChanged = (prevFlights, currentFlights) => {
 };
 
 // Set up periodic flight fetching every 5 minutes to reduce frequency of updates
-console.log('🔄 Setting up periodic flight fetching every 5 minutes');
-setInterval(checkAndBroadcastFlightChanges, 5 * 60 * 1000);
+console.log('Setting up periodic flight fetching every 5 minutes');
+setInterval(checkAndBroadcastFlightChanges, 15000);
 
 // Initial fetch - only do this once on startup
 checkAndBroadcastFlightChanges();
 
-console.log('🔄 Flight updates will occur every 5 minutes or when data changes');
+console.log('Flight updates will occur every 5 minutes or when data changes');
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
@@ -182,14 +182,14 @@ async function startServer() {
     
     // Start server
     server.listen(PORT, () => {
-      console.log(`🚀 Flight Tracker Backend running on http://localhost:${PORT}`);
-      console.log(`📡 WebSocket server ready for real-time updates`);
-      console.log(`✈️  OpenSky API integration enabled with periodic updates every 5 minutes`);
-      console.log(`🔐 Authentication endpoints available at /api/auth`);
+      console.log(`Flight Tracker Backend running on http://localhost:${PORT}`);
+      console.log(`WebSocket server ready for real-time updates`);
+      console.log(` OpenSky API integration enabled with periodic updates every 5 minutes`);
+      console.log(`Authentication endpoints available at /api/auth`);
     });
     
   } catch (error) {
-    console.error('❌ Failed to start server:', error.message);
+    console.error('Failed to start server:', error.message);
     process.exit(1);
   }
 }

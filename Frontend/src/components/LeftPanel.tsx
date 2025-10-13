@@ -1,6 +1,8 @@
 import React, { memo } from 'react';
 import FlightPathMap from './FlightPathMap';
 import { TechnicalDetails } from './TechnicalDetails';
+import { ArrowLeft } from 'lucide-react';
+
 
 interface LeftPanelProps {
   selectedFlight: {
@@ -23,11 +25,9 @@ export const LeftPanel: React.FC<LeftPanelProps> = memo(({ selectedFlight, onBac
     return (
       <div className="h-full bg-gradient-to-br from-blue-900/30 to-cyan-800/20 backdrop-blur-sm border-r border-cyan-400/20 flex items-center justify-center p-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-cyan-300 mb-2">Flight Tracker</h1>
+
           <div className="w-16 h-1 mx-auto bg-cyan-400/50 rounded-full mb-4"></div>
-          <p className="text-cyan-100/80 text-sm leading-relaxed">
-            Click on any flight marker to view detailed information here.
-          </p>
+         
         </div>
       </div>
     );
@@ -42,8 +42,9 @@ export const LeftPanel: React.FC<LeftPanelProps> = memo(({ selectedFlight, onBac
           <button
             onClick={onBackToMap}
             className="px-3 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/30 transition-all text-sm"
+            aria-label='Back to Map'
           >
-            Back to Map
+            <ArrowLeft className="w-4 h-4" />
           </button>
         )}
       </div>

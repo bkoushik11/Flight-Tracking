@@ -3,12 +3,8 @@ import { FlightMap } from '../components/FlightMap';
 import { Layers, MapLayerProvider } from '../components/Layers';
 import { LeftPanel } from '../components/LeftPanel';
 import { Flight } from '../types/flight';
-// import { Layers as LayersIcon } from 'lucide-react';
-import pathTrackData from '../Data/pathtrack.json';
-import { Position as PastTrackPosition } from '../components/PastTrackLayer';
-// import { useNavigate } from 'react-router-dom';
 import { INDIAN_AIRPORTS } from '../components/IndianAirports';
-import { Play, Pause, RotateCcw } from 'lucide-react';
+import L from 'leaflet';
 
 interface MapPageProps {
   flights: Flight[];
@@ -19,6 +15,7 @@ interface MapPageProps {
   selectedFlight: Flight | null;
   onBackToMap: () => void;
   showLeftPanel: boolean;
+  onShowPathTrack?: () => void;
 }
 
 const MapPageInner: React.FC<MapPageProps> = ({ 
@@ -28,16 +25,18 @@ const MapPageInner: React.FC<MapPageProps> = ({
   onMapClick,
   selectedFlight,
   onBackToMap,
-  showLeftPanel
+  showLeftPanel,
+  onShowPathTrack
 }) => {
   const [mousePosition, setMousePosition] = useState<{ lat: number; lng: number } | null>(null);
   const [notifications, setNotifications] = useState<{id: string, message: string, type: string}[]>([]);
   const notificationTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const [showPastTrack, setShowPastTrack] = useState<boolean>(true);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [playIndex, setPlayIndex] = useState<number>(0);
-  const positions: PastTrackPosition[] = (pathTrackData as any).positions?.slice(0, 12) || [];
+  const [drawnRectangles, setDrawnRectangles] = useState<L.LatLngBounds[]>([]);
+  const [isDrawingActive, setIsDrawingActive] = useState(false);
   // const navigate = useNavigate();
+
+  // Backend now sends only 2 flights, so we can use them directly
+  const filteredFlights = flights;
 
   // Throttle mouse move updates to prevent excessive re-renders
   const handleMapMouseMove = useCallback((lat: number, lng: number) => {
@@ -97,6 +96,37 @@ const MapPageInner: React.FC<MapPageProps> = ({
     showAirportNotification(flight);
   }, [onFlightClick, showAirportNotification]);
 
+  // Handle rectangle drawing - simplified
+  const handleRectangleDrawn = useCallback((bounds: L.LatLngBounds) => {
+    setDrawnRectangles(prev => [...prev, bounds]);
+    setIsDrawingActive(false); // Reset drawing state after rectangle is drawn
+    
+    // Show simple notification
+    const notificationId = `rectangle-${Date.now()}`;
+    const message = `Rectangle drawn successfully`;
+    
+    setNotifications(prev => [...prev, {id: notificationId, message, type: 'info'}]);
+    
+    // Remove notification after 3 seconds
+    const timeout = setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      notificationTimeoutsRef.current.delete(notificationId);
+    }, 3000);
+    
+    notificationTimeoutsRef.current.set(notificationId, timeout);
+  }, []);
+
+  // New function to zoom to the last drawn rectangle
+  // const handleZoomToLastRectangle = useCallback(() => {
+  //   if (drawnRectangles.length > 0) {
+  //     const lastRectangle = drawnRectangles[drawnRectangles.length - 1];
+  //     const map = (window as any).mapInstance;
+  //     if (map) {
+  //       map.fitBounds(lastRectangle, { padding: [50, 50] });
+  //     }
+  //   }
+  // }, [drawnRectangles]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -106,25 +136,19 @@ const MapPageInner: React.FC<MapPageProps> = ({
     };
   }, []);
 
-  // Simple playback effect advancing through positions
+  // Handle map resize when panel state changes
   useEffect(() => {
-    if (!showPastTrack || !isPlaying || positions.length === 0) return;
-    if (playIndex >= positions.length - 1) return;
-    const id = setInterval(() => {
-      setPlayIndex((idx) => Math.min(idx + 1, positions.length - 1));
-    }, 800);
-    return () => clearInterval(id);
-  }, [showPastTrack, isPlaying, playIndex, positions.length]);
+    // Trigger map resize when panel state changes
+    const timer = setTimeout(() => {
+      const mapInstance = (window as any).mapInstance;
+      if (mapInstance && mapInstance.invalidateSize) {
+        mapInstance.invalidateSize();
+      }
+    }, 150);
+    
+    return () => clearTimeout(timer);
+  }, [showLeftPanel]);
 
-  const handleReplay = () => {
-    setPlayIndex(0);
-    setIsPlaying(true);
-    setShowPastTrack(true);
-  };
-
-  const currentPlaybackPos = positions.length
-    ? positions[Math.min(playIndex, positions.length - 1)]
-    : null;
 
   // Keep the right map container from remounting by stabilizing props/handlers
   // onFlightClick is memoized from parent; no extra wrapper needed
@@ -140,18 +164,21 @@ const MapPageInner: React.FC<MapPageProps> = ({
         )}
         
         {/* Right Side - Always show the map */}
-        <div className={showLeftPanel && selectedFlight ? "w-full md:w-2/3 h-1/2 md:h-full relative" : "w-full h-full relative"}>
+        <div className={showLeftPanel && selectedFlight ? "w-full md:w-2/3 h-1/2 md:h-full relative" : "w-full h-full relative"} key={showLeftPanel ? 'split' : 'full'}>
           <FlightMap
-            flights={flights}
+            flights={filteredFlights}
             onFlightClick={handleFlightClickWithNotification}
             onMapClick={onMapClick}
             onMouseMove={handleMapMouseMove}
             selectedFlight={selectedFlight}
-            pastTrack={{ positions, isVisible: showPastTrack, flightId: (pathTrackData as any).flightId || 'past-track', currentIndex: playIndex }}
+            pastTrack={undefined}
+            onRectangleDrawn={handleRectangleDrawn}
+            showLeftPanel={showLeftPanel}
+            onBackToMap={onBackToMap}
           />
           
           {/* Logout Button - Positioned at top right (full screen) or top left (split screen) */}
-          <div className={`absolute ${selectedFlight ? 'top-4 left-4' : 'top-4 right-4'} z-[1000]`}>
+          <div className="absolute bottom-4 right-4 z-[1000]">
             <button
               onClick={onLogout}
               className="px-3 py-2 bg-slate-900/90 backdrop-blur-md border border-red-400/40 rounded-lg flex items-center justify-center gap-2 text-red-400 hover:bg-red-500/20 transition-all shadow-lg text-sm"
@@ -160,30 +187,67 @@ const MapPageInner: React.FC<MapPageProps> = ({
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
               </svg>
-              <span className="hidden sm:inline">Logout</span>
+              
             </button>
           </div>
           
           {/* Layers Control - Positioned below logout button */}
-          <div className={`absolute ${selectedFlight ? 'top-20 left-4' : 'top-20 right-2'} z-[1000]`}>
+          <div className="absolute top-20 right-2 z-[1000]">
             <div className="inline-flex p-0.5 bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-md shadow-lg">
               <Layers />
             </div>
-            {/* Path Track Toggle below Layers */}
-            <div className="mt-2 bg-slate-900/90 backdrop-blur-md border border-amber-400/40 rounded-lg shadow-lg">
-              <button
-                onClick={() => { setShowPastTrack(!showPastTrack); if (!showPastTrack) { setPlayIndex(0); } }}
-                className={`px-3 py-2 flex items-center gap-2 text-amber-300 hover:bg-amber-500/20 transition-all rounded-lg ${showPastTrack ? 'bg-amber-500/20' : ''}`}
-                aria-label="Path Track"
-              >
-                <span className="text-sm">Path Track</span>
-              </button>
+            
+            {/* Drawing Controls */}
+            <div className="mt-2 bg-slate-900/90 backdrop-blur-md border border-blue-400/40 rounded-lg shadow-md">
+              <div className="px-1 py-1 flex flex-col gap-2">
+                {/* Rectangle Drawing Icon */}
+                <button
+                  onClick={() => {
+                    // Simple rectangle drawing activation
+                    const map = (window as any).mapInstance;
+                    if (map && map.enableRectangleDrawing) {
+                      map.enableRectangleDrawing();
+                      setIsDrawingActive(true);
+                    }
+                  }}
+                  className={`p-2 border rounded transition-all ${
+                    isDrawingActive 
+                      ? 'bg-blue-500/40 text-blue-200 border-blue-400/60' 
+                      : 'bg-blue-500/20 text-blue-300 border-blue-400/30 hover:bg-blue-500/30'
+                  }`}
+                  title={isDrawingActive ? "Rectangle drawing active - Click and drag on map" : "Draw Rectangle"}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-square-pen">
+                    <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
+                  </svg>
+                </button>
+                
+                {/* Clear Drawing Icon */}
+                <button
+                  onClick={() => {
+                    // Clear all drawn rectangles
+                    setDrawnRectangles([]);
+                    setIsDrawingActive(false);
+                    const map = (window as any).mapInstance;
+                    if (map && map.drawnLayers) {
+                      map.drawnLayers.clearLayers();
+                    }
+                  }}
+                  className="p-2 bg-red-500/20 text-red-300 border border-red-400/30 rounded hover:bg-red-500/30 transition-all"
+                  title="Clear All"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
           
-          {/* Latitude and Longitude Display - Positioned at bottom right of map area */}
+          {/* Latitude and Longitude Display - Positioned at same level as zoom controls */}
           {mousePosition && (
-            <div className="absolute bottom-4 right-24 bg-gray-700/90 backdrop-blur-sm border border-gray-500/50 rounded-lg px-3 py-2 shadow-lg z-[1000]">
+            <div className="absolute bottom-20 right-20 bg-gray-700/90 backdrop-blur-sm border border-gray-500/50 rounded-lg px-3 py-2 shadow-lg z-[1000]">
               <div className="text-gray-200 text-sm font-mono flex flex-col items-center">
                 <div>Lat: {mousePosition.lat.toFixed(6)}</div>
                 <div>Lng: {mousePosition.lng.toFixed(6)}</div>
@@ -206,39 +270,21 @@ const MapPageInner: React.FC<MapPageProps> = ({
             ))}
           </div>
 
-          {/* Bottom Playback Controls */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000]">
-            <div className="bg-slate-900/90 backdrop-blur-md border border-amber-400/40 rounded-xl px-4 py-2 shadow-lg flex items-center gap-3">
-              <button
-                onClick={() => setIsPlaying(p => !p)}
-                className="px-3 py-1.5 bg-amber-500/20 text-amber-300 border border-amber-400/30 rounded-lg hover:bg-amber-500/30 transition-all"
-                aria-label={isPlaying ? 'Pause' : 'Play'}
-                disabled={!showPastTrack}
-              >
-                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              </button>
-              <button
-                onClick={handleReplay}
-                className="px-3 py-1.5 bg-amber-500/20 text-amber-300 border border-amber-400/30 rounded-lg hover:bg-amber-500/30 transition-all"
-                aria-label="Replay"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </button>
-              <div className="text-amber-200 text-xs font-mono">
-                {Math.min(playIndex + 1, positions.length)} / {positions.length}
-              </div>
-              <div className="w-40 h-2 bg-slate-700 rounded overflow-hidden">
-                <div className="h-full bg-amber-400" style={{ width: `${positions.length ? ((Math.min(playIndex + 1, positions.length) / positions.length) * 100) : 0}%` }} />
-              </div>
-              {currentPlaybackPos && (
-                <div className="ml-2 text-amber-200 text-[11px] font-mono whitespace-nowrap">
-                  Lat: {currentPlaybackPos.lat.toFixed(5)}
-                  {" "}| Lng: {currentPlaybackPos.lng.toFixed(5)}
-                  {" "}| Time: {new Date(currentPlaybackPos.timestamp).toLocaleTimeString()}
+
+          {/* Drawn Rectangles Info */}
+          {drawnRectangles.length > 0 && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000]">
+              <div className="bg-slate-900/90 backdrop-blur-md border border-blue-400/40 rounded-lg px-3 py-2 shadow-lg">
+                <div className="text-blue-300 text-sm font-medium">
+                  Drawn Areas: {drawnRectangles.length}
                 </div>
-              )}
+                <div className="text-blue-200 text-xs">
+                  Use the draw tool to create rectangles
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
         </div>
         
         

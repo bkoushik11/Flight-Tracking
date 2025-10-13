@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import MapPage from './pages/MapPage';
+import PathTrackPage from './pages/PathTrackPage';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginPage } from './pages/LoginPage';
@@ -54,9 +55,8 @@ function App() {
   const handleBackToMap = useCallback(() => {
     setSelectedFlight(null);
     setShowLeftPanel(false);
-    // Don't navigate to '/' as this might be causing the full page refresh
-    // The MapPage component should handle the display logic
-  }, []);
+    navigate('/');
+  }, [navigate]);
 
   // Keep selectedFlight in sync with live updates
   useEffect(() => {
@@ -95,8 +95,12 @@ function App() {
     }
   }, [logout, navigate]);
 
-  const handleShowRecordings = useCallback(() => {
-    navigate('/recordings');
+  // const handleShowRecordings = useCallback(() => {
+  //   navigate('/recordings');
+  // }, [navigate]);
+
+  const handleShowPathTrack = useCallback(() => {
+    navigate('/pathtrack');
   }, [navigate]);
 
   // Memoize the flights data to prevent unnecessary re-renders
@@ -124,7 +128,8 @@ function App() {
                 flights={memoizedFlights}
                 user={user}
                 onFlightClick={handleFlightClick}
-                onShowRecordings={handleShowRecordings}
+                // onShowRecordings={handleShowRecordings}
+                onShowPathTrack={handleShowPathTrack}
                 onLogout={handleLogout}
                 onMapClick={handleMapClick}
                 selectedFlight={selectedFlight}
@@ -138,6 +143,17 @@ function App() {
           <ProtectedRoute isAuthenticated={isAuthenticated}>
             <ErrorBoundary>
               <RecordingsPage onBack={handleBackToMap} />
+            </ErrorBoundary>
+          </ProtectedRoute>
+        } />
+        <Route path="/pathtrack" element={
+          <ProtectedRoute isAuthenticated={isAuthenticated}>
+            <ErrorBoundary>
+              <PathTrackPage 
+                flights={memoizedFlights}
+                onBack={handleBackToMap}
+                onLogout={handleLogout}
+              />
             </ErrorBoundary>
           </ProtectedRoute>
         } />
