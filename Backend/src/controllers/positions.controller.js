@@ -1,5 +1,10 @@
 const mongoose = require('mongoose');
 const FlightPosition = require('../models/FlightPosition');
+const {
+  startRecordingFlight,
+  stopRecordingFlight,
+  listRecordingFlights,
+} = require('../services/recordingState');
 
 class PositionsController {
   // Start recording for a specific flight: reset or create positions doc
@@ -17,7 +22,9 @@ class PositionsController {
         doc.positions = [];
       }
       await doc.save();
-      return res.json({ success: true, message: 'Recording started', flightId });
+      // Add to in-memory recording set
+      startRecordingFlight(flightId);
+      return res.json({ success: true, message: 'Recording started', flightId, recording: true });
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to start recording:', error);
@@ -32,7 +39,9 @@ class PositionsController {
       if (!flightId) {
         return res.status(400).json({ error: 'Missing flightId in body' });
       }
-      return res.json({ success: true, message: 'Recording stopped', flightId });
+      // Remove from in-memory recording set
+      stopRecordingFlight(flightId);
+      return res.json({ success: true, message: 'Recording stopped', flightId, recording: false });
     } catch (error) {
       return res.status(500).json({ error: 'Failed to stop recording', message: error.message });
     }
@@ -62,9 +71,14 @@ class PositionsController {
   // List recorded flights (IDs)
   async listRecordedFlights(_req, res) {
     try {
-      const docs = await FlightPosition.find({}, { flightId: 1 }).lean();
+      // Return the latest 20 by last update time
+      const docs = await FlightPosition
+        .find({}, { flightId: 1, updatedAt: 1 })
+        .sort({ updatedAt: -1 })
+        .limit(20)
+        .lean();
       const ids = docs.map(d => d.flightId);
-      return res.json({ success: true, flightIds: ids });
+      return res.json({ success: true, flightIds: ids, currentlyRecording: listRecordingFlights() });
     } catch (error) {
       return res.status(500).json({ error: 'Failed to list recorded flights', message: error.message });
     }

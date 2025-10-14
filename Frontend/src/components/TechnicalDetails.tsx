@@ -6,8 +6,8 @@ interface TechnicalDetailsProps {
     id: string;
     flightNumber: string;
     status?: string;
-    origin?: string;
-    destination?: string;
+    // origin?: string;
+    // destination?: string;
     latitude?: number;
     longitude?: number;
     altitude?: number;
@@ -19,8 +19,8 @@ interface TechnicalDetailsProps {
 
 export const TechnicalDetails: React.FC<TechnicalDetailsProps> = memo(({ selectedFlight }) => {
   // Get origin and destination for display
-  const origin = selectedFlight.origin || 'Unknown';
-  const destination = selectedFlight.destination || 'Unknown';
+  // const origin = selectedFlight.origin || 'Unknown';
+  // const destination = selectedFlight.destination || 'Unknown';
   
   return (
     <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl h-full flex flex-col p-2">
@@ -35,7 +35,7 @@ export const TechnicalDetails: React.FC<TechnicalDetailsProps> = memo(({ selecte
       </div>
 
       {/* Route Information - Compact */}
-      <div className="bg-slate-800/30 rounded-lg p-2 mb-2 flex-shrink-0">
+      {/* <div className="bg-slate-800/30 rounded-lg p-2 mb-2 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
             <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
@@ -47,7 +47,7 @@ export const TechnicalDetails: React.FC<TechnicalDetailsProps> = memo(({ selecte
             <div className="w-1.5 h-1.5 bg-red-400 rounded-full"></div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Flight Metrics - Compact Grid */}
       <div className="grid grid-cols-3 gap-1 mb-3 flex-shrink-0">
@@ -97,21 +97,5 @@ export const TechnicalDetails: React.FC<TechnicalDetailsProps> = memo(({ selecte
         </div>
       </div>
     </div>
-  );
-}, (prevProps, nextProps) => {
-  // Only re-render if there are actual changes in flight data
-  const prev = prevProps.selectedFlight;
-  const next = nextProps.selectedFlight;
-  
-  if (!prev || !next) return prev !== next;
-  
-  return (
-    prev.id === next.id &&
-    prev.flightNumber === next.flightNumber &&
-    Math.abs((prev.latitude || 0) - (next.latitude || 0)) < 0.005 &&
-    Math.abs((prev.longitude || 0) - (next.longitude || 0)) < 0.005 &&
-    Math.abs((prev.altitude || 0) - (next.altitude || 0)) < 10 &&
-    Math.abs((prev.speed || 0) - (next.speed || 0)) < 5 &&
-    Math.abs((prev.heading || 0) - (next.heading || 0)) < 1
   );
 });

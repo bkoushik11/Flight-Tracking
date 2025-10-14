@@ -14,7 +14,7 @@ interface PathTrackPageProps {
 }
 
 const PathTrackPage: React.FC<PathTrackPageProps> = ({ 
-  flights, 
+  // flights, 
   onBack
 }) => {
   const [showPastTrack, setShowPastTrack] = useState<boolean>(true);
@@ -24,6 +24,7 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
   const [drawnRectangles, setDrawnRectangles] = useState<L.LatLngBounds[]>([]);
   const [availableFlightIds, setAvailableFlightIds] = useState<string[]>([]);
   const [activeFlightId, setActiveFlightId] = useState<string>('');
+  
 
   // Load recorded flight ids
   useEffect(() => {
@@ -114,7 +115,7 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
         {/* Map Container */}
         <div className="h-full w-full relative">
           <FlightMap
-            flights={flights}
+            flights={[]}
             onFlightClick={handleFlightClick}
             onMapClick={handleMapClick}
             onMouseMove={handleMapMouseMove}
@@ -123,9 +124,11 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
               positions, 
               isVisible: showPastTrack, 
               flightId: activeFlightId || 'past-track', 
-              currentIndex: playIndex 
+              currentIndex: playIndex,
+              isPlaying: isPlaying,
+              stepDurationMs: 800 
             }}
-            onRectangleDrawn={handleRectangleDrawn}
+            onRectangleDrawn={undefined}
           />
           
           {/* Back Button - Top Left */}
@@ -141,22 +144,49 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
           {/* Controls Panel - Top Right */}
           <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-3">
             
-            {/* Recorded Flights Selector */}
+            {/* Recorded Flights Selector (with inline delete per flight) */}
             <div className="bg-slate-900/90 backdrop-blur-md border border-emerald-400/40 rounded-lg shadow-lg p-2">
               <div className="text-emerald-300 text-sm font-medium mb-1">Recorded Flights</div>
-              <div className="flex gap-2 flex-wrap max-w-[240px]">
+              <div className="flex gap-2 flex-wrap max-w-[280px]">
                 {availableFlightIds.length === 0 && (
                   <div className="text-slate-400 text-xs">No recordings yet</div>
                 )}
                 {availableFlightIds.map(fid => (
-                  <button
-                    key={fid}
-                    onClick={() => setActiveFlightId(fid)}
-                    className={`px-2 py-1 text-xs rounded border transition-all ${activeFlightId === fid ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/50' : 'bg-emerald-500/10 text-emerald-300 border-emerald-400/30 hover:bg-emerald-500/20'}`}
-                    title={fid}
-                  >
-                    {fid}
-                  </button>
+                  <div key={fid} className="inline-flex items-center gap-1">
+                    <button
+                      onClick={() => setActiveFlightId(fid)}
+                      className={`px-2 py-1 text-xs rounded border transition-all ${activeFlightId === fid ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/50' : 'bg-emerald-500/10 text-emerald-300 border-emerald-400/30 hover:bg-emerald-500/20'}`}
+                      title={fid}
+                    >
+                      {fid}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await deleteRecordedFlight(fid);
+                          // If the deleted one is active, reset selection
+                          let nextActive = activeFlightId;
+                          if (activeFlightId === fid) {
+                            nextActive = '';
+                          }
+                          const res = await listRecordedFlightIds();
+                          setAvailableFlightIds(res.flightIds || []);
+                          setActiveFlightId(nextActive || (res.flightIds?.[0] || ''));
+                          if (activeFlightId === fid) {
+                            setPositions([]);
+                            setPlayIndex(0);
+                          }
+                        } catch (e) {
+                          console.error('Failed to delete recorded flight', e);
+                        }
+                      }}
+                      className="p-1 text-red-300 hover:text-red-200 border border-red-400/30 rounded"
+                      aria-label={`Delete ${fid}`}
+                      title={`Delete ${fid}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -174,30 +204,7 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
                 </button>
               </div>
 
-              {/* Larger delete icon in small box, with real delete functionality */}
-              <div className="inline-flex p-1 bg-slate-900/90 backdrop-blur-md border border-red-400/40 rounded-md shadow-lg">
-                <button
-                  onClick={async () => {
-                    if (!activeFlightId) return;
-                    try {
-                      await deleteRecordedFlight(activeFlightId);
-                      // Refresh lists and UI
-                      setPositions([]);
-                      setPlayIndex(0);
-                      const res = await listRecordedFlightIds();
-                      setAvailableFlightIds(res.flightIds || []);
-                      setActiveFlightId(res.flightIds?.[0] || '');
-                    } catch (e) {
-                      console.error('Failed to delete recorded flight', e);
-                    }
-                  }}
-                  className="px-2 py-1 text-sm text-red-300 hover:text-red-200"
-                  aria-label="Delete Flight Path"
-                  title="Delete Flight Path"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
+              {/* Per-flight delete moved inline next to each recorded flight */}
             </div>
             
           </div>

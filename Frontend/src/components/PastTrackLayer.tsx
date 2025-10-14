@@ -19,6 +19,8 @@ interface PastTrackLayerProps {
   flightId: string;
   showStartPlane?: boolean;
   currentIndex?: number; // moving plane index along the path
+  isPlaying?: boolean; // whether playback is active
+  stepDurationMs?: number; // duration between indices for interpolation
 }
 
 const createStartPlaneIcon = (heading: number) => {
@@ -31,7 +33,7 @@ const createStartPlaneIcon = (heading: number) => {
         display: flex;
         align-items: center;
         justify-content: center;
-        transform: rotate(${heading - 67}deg);
+        transform: rotate(${heading - 90}deg);
         background: rgba(16,185,129,0.08);
         border-radius: 9999px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.25);
@@ -85,12 +87,18 @@ export const PastTrackLayer: React.FC<PastTrackLayerProps> = ({
   isVisible, 
   flightId,
   showStartPlane = true,
-  currentIndex
+  currentIndex,
+  isPlaying = false,
+  stepDurationMs = 800
 }) => {
   const map = useMap();
   const polylineRef = useRef<L.Polyline | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const movingPlaneRef = useRef<L.Marker | null>(null);
+  const animRef = useRef<number | null>(null);
+  const animStartTimeRef = useRef<number | null>(null);
+  const fromIdxRef = useRef<number>(0);
+  const toIdxRef = useRef<number>(0);
 
   useEffect(() => {
     if (!isVisible || positions.length === 0) {
@@ -172,22 +180,95 @@ export const PastTrackLayer: React.FC<PastTrackLayerProps> = ({
     };
   }, [map, positions, isVisible, flightId, showStartPlane]);
 
-  // Update moving plane position when currentIndex changes
+  // Smoothly interpolate the moving plane between indices
   useEffect(() => {
     if (!isVisible || positions.length === 0) return;
-    const idx = typeof currentIndex === 'number' ? Math.max(0, Math.min(currentIndex, positions.length - 1)) : 0;
-    const pos = positions[idx];
-    if (!pos) return;
 
-    const heading = getHeadingForIndex(positions, idx);
-    const icon = createStartPlaneIcon(heading);
-    if (!movingPlaneRef.current) {
-      movingPlaneRef.current = L.marker([pos.lat, pos.lng], { icon }).addTo(map);
-    } else {
-      movingPlaneRef.current.setLatLng([pos.lat, pos.lng]);
-      movingPlaneRef.current.setIcon(icon);
+    const clampIndex = (i: number) => Math.max(0, Math.min(i, positions.length - 1));
+    const idx = typeof currentIndex === 'number' ? clampIndex(currentIndex) : 0;
+    const nextIdx = clampIndex(idx + 1);
+
+    // Cancel any running animation on change
+    if (animRef.current) {
+      cancelAnimationFrame(animRef.current);
+      animRef.current = null;
     }
-  }, [map, isVisible, positions, currentIndex]);
+    animStartTimeRef.current = null;
+    fromIdxRef.current = idx;
+    toIdxRef.current = nextIdx;
+
+    const placeAtIndex = (placeIdx: number) => {
+      const p = positions[placeIdx];
+      if (!p) return;
+      const heading = getHeadingForIndex(positions, placeIdx);
+      const icon = createStartPlaneIcon(heading);
+      if (!movingPlaneRef.current) {
+        movingPlaneRef.current = L.marker([p.lat, p.lng], { icon }).addTo(map);
+      } else {
+        movingPlaneRef.current.setLatLng([p.lat, p.lng]);
+        movingPlaneRef.current.setIcon(icon);
+      }
+    };
+
+    // If not playing or at the last point, snap to the current index
+    if (!isPlaying || idx === nextIdx) {
+      placeAtIndex(idx);
+      return;
+    }
+
+    const from = positions[idx];
+    const to = positions[nextIdx];
+    if (!from || !to) {
+      placeAtIndex(idx);
+      return;
+    }
+
+    const normalizeAngle = (deg: number) => ((deg % 360) + 360) % 360;
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+    const headingFrom = getHeadingForIndex(positions, idx);
+    const headingTo = getHeadingForIndex(positions, nextIdx);
+    let delta = normalizeAngle(headingTo) - normalizeAngle(headingFrom);
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+
+    const animate = (ts: number) => {
+      if (animStartTimeRef.current === null) animStartTimeRef.current = ts;
+      const elapsed = ts - (animStartTimeRef.current || 0);
+      const duration = Math.max(100, stepDurationMs);
+      const tRaw = Math.min(1, elapsed / duration);
+      // easeInOutQuad
+      const t = tRaw < 0.5 ? 2 * tRaw * tRaw : -1 + (4 - 2 * tRaw) * tRaw;
+
+      const lat = lerp(from.lat, to.lat, t);
+      const lng = lerp(from.lng, to.lng, t);
+      const heading = normalizeAngle(headingFrom + delta * t);
+      const icon = createStartPlaneIcon(heading);
+
+      if (!movingPlaneRef.current) {
+        movingPlaneRef.current = L.marker([lat, lng], { icon }).addTo(map);
+      } else {
+        movingPlaneRef.current.setLatLng([lat, lng]);
+        movingPlaneRef.current.setIcon(icon);
+      }
+
+      if (tRaw < 1 && isPlaying) {
+        animRef.current = requestAnimationFrame(animate);
+      } else {
+        // Snap to end to avoid drift
+        placeAtIndex(nextIdx);
+        animRef.current = null;
+        animStartTimeRef.current = null;
+      }
+    };
+
+    animRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      animRef.current = null;
+      animStartTimeRef.current = null;
+    };
+  }, [map, isVisible, positions, currentIndex, isPlaying, stepDurationMs]);
 
   return null;
 };

@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const routes = require("./routes");
+// const path = require('path');
 
 const flightService = require("./services/flights/flightService.js");
 
@@ -46,6 +47,19 @@ app.get("/health", (req, res) => {
 // } catch (error) {
 //   res.status(500).json({ error: error.message });
 // }})
+
+// app.get('/*', (req, res) => {
+//   res.sendFile(path.join(__dirname, '../../Frontend/build', 'index.html'));
+// });
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error("Error:", err);
+  res.status(500).json({ 
+    error: "Internal server error",
+    message: process.env.NODE_ENV === "development" ? err.message : "Something went wrong"
+  });
+});
 
 // Add a status endpoint for debugging
 app.get('/api/status', (req, res) => {

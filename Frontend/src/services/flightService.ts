@@ -10,8 +10,8 @@ export async function fetchPositions(flightId: string): Promise<PositionsRespons
   return httpGet<PositionsResponse>(`/positions/default?flightId=${encodeURIComponent(flightId)}`);
 }
 
-export async function listRecordedFlightIds(): Promise<{ success: boolean; flightIds: string[] }> {
-  return httpGet<{ success: boolean; flightIds: string[] }>(`/positions/recorded`);
+export async function listRecordedFlightIds(): Promise<{ success: boolean; flightIds: string[]; currentlyRecording?: string[] }> {
+  return httpGet<{ success: boolean; flightIds: string[]; currentlyRecording?: string[] }>(`/positions/recorded`);
 }
 
 export async function startRecording(flightId: string): Promise<{ success: boolean; message: string; flightId: string }> {
@@ -32,6 +32,7 @@ export async function deleteRecordedFlight(flightId: string): Promise<{ success:
 
 import type { Flight } from '../types/flight';
 
+
 export interface FlightApiResponse {
   flights: any[];
   total: number;
@@ -39,10 +40,7 @@ export interface FlightApiResponse {
   limit: number;
 }
 
-// Local storage for flight data caching
-let flightCache: Flight[] = [];
-let lastFetchTime = 0;
-const CACHE_DURATION = 10000; // Increased to 10 seconds to match backend update interval
+// Client-side cache removed to ensure real-time updates reflect immediately
 
 export class FlightService {
   async getFlights(params?: {
@@ -54,13 +52,6 @@ export class FlightService {
   }): Promise<FlightApiResponse> {
     const page = params?.page ?? 1;
     const limit = params?.limit ?? Number.MAX_SAFE_INTEGER;
-
-    // Check cache first
-    const now = Date.now();
-    if (now - lastFetchTime < CACHE_DURATION && flightCache.length > 0) {
-      const filtered = this.applyFilters(flightCache);
-      return this.paginateResults(filtered, page, limit);
-    }
 
     try {
       console.log('📡 Fetching flights from backend API...');
@@ -103,20 +94,11 @@ export class FlightService {
         });
       }
 
-      // Update cache
-      flightCache = flights;
-      lastFetchTime = now;
-
       // Apply filters and pagination
       const filtered = this.applyFilters(flights);
       return this.paginateResults(filtered, page, limit);
     } catch (error) {
       console.error('Error fetching flights:', error);
-      // Return cached data if available
-      if (flightCache.length > 0) {
-        const filtered = this.applyFilters(flightCache);
-        return this.paginateResults(filtered, page, limit);
-      }
       return { flights: [], total: 0, page, limit };
     }
   }
@@ -134,14 +116,6 @@ export class FlightService {
 
   async getFlightById(id: string, opts?: { refresh?: boolean }): Promise<Flight | null> {
     try {
-      // Check cache first unless refresh explicitly requested
-      if (!opts?.refresh) {
-        const cachedFlight = flightCache.find(f => f.id === id);
-        if (cachedFlight) {
-          return cachedFlight;
-        }
-      }
-
       // Fetch from API
       const refreshQuery = opts?.refresh ? '?refresh=1' : '';
       const f = await httpGet<any>(`/flights/${id}${refreshQuery}`);
@@ -162,15 +136,6 @@ export class FlightService {
         lastUpdate: new Date(f.updatedAt ?? Date.now()),
         path,
       };
-
-      // Update cache entry for this flight
-      const idx = flightCache.findIndex(fl => fl.id === mapped.id);
-      if (idx >= 0) {
-        flightCache[idx] = mapped;
-      } else {
-        flightCache.push(mapped);
-      }
-
       return mapped;
     } catch (error) {
       console.error('Error fetching flight by ID:', error);
@@ -184,14 +149,12 @@ export class FlightService {
       return res.count;
     } catch (error) {
       console.error('Error fetching flight count:', error);
-      return flightCache.length;
+      return 0;
     }
   }
 
   async refreshData(): Promise<void> {
-    // Force refresh by clearing cache
-    flightCache = [];
-    lastFetchTime = 0;
+    // No-op: client cache removed
   }
 }
 

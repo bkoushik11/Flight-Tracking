@@ -1,11 +1,17 @@
 const axios = require('axios');
 const { GEOGRAPHIC_BOUNDS, CONFIG } = require("../../utils/constants");
 
-// OpenSky API configuration - using anonymous access only
+// OpenSky API configuration - authenticated (OAuth Client Credentials)
 const OPENSKY_API_BASE = 'https://opensky-network.org/api/states/all';
+const TOKEN_URL = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
+const OPENSKY_CLIENT_ID = process.env.OPENSKY_CLIENT_ID;
+const OPENSKY_CLIENT_SECRET = process.env.OPENSKY_CLIENT_SECRET;
+
+let cachedToken = null;
+let tokenExpiry = 0;
 const API_TIMEOUT = 15000; // 15 seconds
-const CACHE_DURATION = 30000; // 30 seconds cache duration
-const MIN_REQUEST_INTERVAL = 30000; // 30 seconds minimum request interval
+const CACHE_DURATION = 5000; // 5 seconds cache duration
+const MIN_REQUEST_INTERVAL = 5000; // 5 seconds minimum request interval
 
 // India geographic boundaries
 const INDIA_BOUNDS = {
@@ -32,7 +38,6 @@ class FlightService {
     
     console.log(`Latitude: ${INDIA_BOUNDS.lamin}° to ${INDIA_BOUNDS.lamax}°`);
     console.log(`Longitude: ${INDIA_BOUNDS.lomin}° to ${INDIA_BOUNDS.lomax}°`);
-    console.log(`Maximum flights: ${CONFIG.FLIGHT_COUNT} (limited to 2 live flights)`);
   }
 
   async getAllFlights() {
@@ -118,6 +123,16 @@ class FlightService {
   }
 
   async _fetchFromOpenSkyAPI() {
+    // Acquire/reuse OAuth access token if credentials are configured
+    const headers = { 'User-Agent': 'Flight-Tracker-App/1.0' };
+    const haveCreds = Boolean(OPENSKY_CLIENT_ID && OPENSKY_CLIENT_SECRET);
+    if (haveCreds) {
+      const token = await this._getAccessToken();
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+    }
+
     // India bounding box params
     const params = new URLSearchParams({
       lamin: INDIA_BOUNDS.lamin.toString(),
@@ -129,13 +144,11 @@ class FlightService {
     const url = `${OPENSKY_API_BASE}?${params.toString()}`;
     const config = {
       timeout: API_TIMEOUT,
-      headers: {
-        'User-Agent': 'Flight-Tracker-App/1.0'
-      }
+      headers
     };
 
     try {
-      console.log('Making anonymous request to OpenSky API...');
+      console.log(haveCreds ? 'Making authenticated request to OpenSky API...' : 'Making anonymous request to OpenSky API...');
       const response = await axios.get(url, config);
 
       if (!response.data?.states) {
@@ -143,11 +156,21 @@ class FlightService {
       }
 
       // Transform to internal flight format and limit
-      const flights = this._transformOpenSkyData(response.data.states).slice(0, CONFIG.FLIGHT_COUNT);
+      const transformed = this._transformOpenSkyData(response.data.states);
+      const configuredLimit = Number(CONFIG.FLIGHT_COUNT);
+      const safeLimit = Number.isFinite(configuredLimit) && configuredLimit > 0
+        ? configuredLimit
+        : transformed.length; // if not set or <= 0, return all
+      const flights = transformed.slice(0, safeLimit);
       
       return flights;
 
     } catch (error) {
+      // If unauthorized, clear token so next call refreshes
+      if (error.response?.status === 401) {
+        cachedToken = null;
+        tokenExpiry = 0;
+      }
       console.error("Error fetching from OpenSky API:", error.message);
       
       // Log additional details for debugging
@@ -158,6 +181,38 @@ class FlightService {
       }
 
       throw error;
+    }
+  }
+
+  async _getAccessToken() {
+    try {
+      const now = Date.now();
+      // Refresh 120s before expiry to be safe
+      if (cachedToken && tokenExpiry && now < tokenExpiry - 120000) {
+        return cachedToken;
+      }
+
+      if (!OPENSKY_CLIENT_ID || !OPENSKY_CLIENT_SECRET) {
+        return null;
+      }
+
+      const params = new URLSearchParams();
+      params.append('grant_type', 'client_credentials');
+      params.append('client_id', OPENSKY_CLIENT_ID);
+      params.append('client_secret', OPENSKY_CLIENT_SECRET);
+
+      const response = await axios.post(TOKEN_URL, params, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: API_TIMEOUT
+      });
+
+      cachedToken = response.data.access_token;
+      tokenExpiry = now + (Number(response.data.expires_in) || 0) * 1000;
+      console.log('✅ OpenSky token fetched successfully');
+      return cachedToken;
+    } catch (err) {
+      console.error('❌ Error fetching OpenSky token:', err.response?.data || err.message);
+      return null;
     }
   }
   
@@ -243,9 +298,13 @@ class FlightService {
       }
     });
     
-    // Sort by most recent update time and limit to 5 flights
+    // Sort by most recent update time and limit to configured flight count (or all if invalid)
     const sortedFlights = validFlights.sort((a, b) => b.updatedAt - a.updatedAt);
-    const limitedFlights = sortedFlights.slice(0, 5);
+    const configuredLimit = Number(CONFIG.FLIGHT_COUNT);
+    const safeLimit = Number.isFinite(configuredLimit) && configuredLimit > 0
+      ? configuredLimit
+      : sortedFlights.length;
+    const limitedFlights = sortedFlights.slice(0, safeLimit);
     
     console.log(`📊 Filtered ${validFlights.length} valid flights to ${limitedFlights.length} live flights`);
     
@@ -353,7 +412,7 @@ class FlightService {
       cacheSize: this.flightCache.size,
       lastFetchTime: new Date(this.lastFetchTime),
       usingOpenSkyAPI: true,
-      hasValidCredentials: false, // Always false for anonymous access
+      hasValidCredentials: Boolean(OPENSKY_CLIENT_ID && OPENSKY_CLIENT_SECRET),
       rateLimitBackoff: this.rateLimitBackoff,
       isInBackoff: this.rateLimitBackoff > Date.now(),
       backoffEndTime: this.rateLimitBackoff ? new Date(this.rateLimitBackoff) : null,

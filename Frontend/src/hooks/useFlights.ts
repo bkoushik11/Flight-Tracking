@@ -9,12 +9,8 @@ export const useFlights = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const socketRef = useRef<Socket | null>(null);
-  const updateBufferRef = useRef<Flight[] | null>(null);
-  const debounceTimerRef = useRef<number | null>(null);
-  const isUpdatingRef = useRef(false);
   const hasReceivedInitialDataRef = useRef(false);
   const pathsRef = useRef<Map<string, [number, number][]>>(new Map());
-  const previousFlightsRef = useRef<Map<string, Flight>>(new Map());
 
   const fetchFlights = useCallback(async (filters?: {
     minAltitude?: number;
@@ -38,64 +34,8 @@ export const useFlights = () => {
         .filter(f => Number.isFinite(f.latitude) && Number.isFinite(f.longitude));
         // Removed strict altitude and speed filtering to show all flights
 
-      setFlights(prevFlights => {
-        // Use diff-based update instead of full replacement
-        let hasChanges = false;
-
-        // Map new flights by ID
-        const newFlightsMap = new Map(sanitized.map(f => [f.id, f]));
-
-        // Update existing flights only if significant changes
-        const updatedFlights = prevFlights.map(prevFlight => {
-          const newFlight = newFlightsMap.get(prevFlight.id);
-          if (!newFlight) return prevFlight; // flight disappeared
-
-          if (hasSignificantChanges(prevFlight, newFlight)) {
-            hasChanges = true;
-            
-            // Update path tracking
-            if (!pathsRef.current.has(newFlight.id)) {
-              pathsRef.current.set(newFlight.id, newFlight.path || []);
-            } else {
-              const existing = pathsRef.current.get(newFlight.id)!;
-              // Only add new point if position changed significantly
-              if (existing.length === 0 || 
-                  Math.abs(existing[existing.length - 1][0] - newFlight.latitude) > 0.000005 ||
-                  Math.abs(existing[existing.length - 1][1] - newFlight.longitude) > 0.000005) {
-                existing.push([newFlight.latitude, newFlight.longitude]);
-              }
-            }
-            newFlight.path = pathsRef.current.get(newFlight.id)!;
-            
-            return newFlight;
-          }
-          return prevFlight;
-        });
-
-        // Add any brand new flights
-        const trulyNewFlights = sanitized.filter(
-          f => !prevFlights.some(pf => pf.id === f.id)
-        );
-        if (trulyNewFlights.length > 0) {
-          hasChanges = true;
-          trulyNewFlights.forEach(f => {
-            // Initialize path for new flight
-            if (!pathsRef.current.has(f.id)) {
-              pathsRef.current.set(f.id, f.path || []);
-            }
-            f.path = pathsRef.current.get(f.id)!;
-          });
-          updatedFlights.push(...trulyNewFlights);
-        }
-
-        // Update the previous flights reference
-        if (hasChanges) {
-          const updatedFlightsMap = new Map(updatedFlights.map(f => [f.id, f]));
-          previousFlightsRef.current = updatedFlightsMap;
-        }
-
-        return hasChanges ? updatedFlights : prevFlights;
-      });
+      // Always replace flights on fetch (initial load or manual refresh)
+      setFlights(sanitized);
       setLastUpdate(new Date());
       hasReceivedInitialDataRef.current = true;
     } catch (err) {
@@ -125,97 +65,9 @@ export const useFlights = () => {
   }, []);
 
   const applyBufferedUpdate = useCallback(() => {
-    if (!updateBufferRef.current || isUpdatingRef.current) return;
-    
-    isUpdatingRef.current = true;
-    try {
-      const newFlights = updateBufferRef.current;
-      updateBufferRef.current = null;
-      
-      // Only update if we have actual data and it's different from current
-      if (newFlights.length > 0) {
-        setFlights(prevFlights => {
-          // Use diff-based update instead of full replacement
-          let hasChanges = false;
-
-          // Map new flights by ID
-          const newFlightsMap = new Map(newFlights.map(f => [f.id, f]));
-
-          // Update existing flights only if significant changes
-          const updatedFlights = prevFlights.map(prevFlight => {
-            const newFlight = newFlightsMap.get(prevFlight.id);
-            if (!newFlight) return prevFlight; // flight disappeared
-
-            if (hasSignificantChanges(prevFlight, newFlight)) {
-              hasChanges = true;
-              
-              // Update path tracking
-              if (!pathsRef.current.has(newFlight.id)) {
-                pathsRef.current.set(newFlight.id, newFlight.path || []);
-              } else {
-                const existing = pathsRef.current.get(newFlight.id)!;
-                // Only add new point if position changed significantly
-                if (existing.length === 0 || 
-                    Math.abs(existing[existing.length - 1][0] - newFlight.latitude) > 0.00005 ||
-                    Math.abs(existing[existing.length - 1][1] - newFlight.longitude) > 0.00005) {
-                  existing.push([newFlight.latitude, newFlight.longitude]);
-                }
-              }
-              newFlight.path = pathsRef.current.get(newFlight.id)!;
-              
-              return newFlight;
-            }
-            return prevFlight;
-          });
-
-          // Add any brand new flights
-          const trulyNewFlights = newFlights.filter(
-            f => !prevFlights.some(pf => pf.id === f.id)
-          );
-          if (trulyNewFlights.length > 0) {
-            hasChanges = true;
-            trulyNewFlights.forEach(f => {
-              // Initialize path for new flight
-              if (!pathsRef.current.has(f.id)) {
-                pathsRef.current.set(f.id, f.path || []);
-              }
-              f.path = pathsRef.current.get(f.id)!;
-            });
-            updatedFlights.push(...trulyNewFlights);
-          }
-
-          // Remove disappeared flights
-          const disappearedFlights = prevFlights.filter(
-            pf => !newFlights.some(f => f.id === pf.id)
-          );
-          if (disappearedFlights.length > 0) {
-            hasChanges = true;
-            disappearedFlights.forEach(f => {
-              // Clean up path tracking for disappeared flights
-              pathsRef.current.delete(f.id);
-            });
-          }
-
-          // Update the previous flights reference
-          if (hasChanges) {
-            const updatedFlightsMap = new Map(updatedFlights.map(f => [f.id, f]));
-            previousFlightsRef.current = updatedFlightsMap;
-    
-            setLastUpdate(new Date());
-            return updatedFlights;
-          }
-          
-          // No significant changes, return previous state to prevent re-render
-          
-          return prevFlights;
-        });
-      }
-    } catch (error) {
-      console.error('Error applying flight updates:', error);
-    } finally {
-      isUpdatingRef.current = false;
-    }
-  }, [hasSignificantChanges]);
+    // No-op after simplification
+    return;
+  }, []);
 
   const refreshData = useCallback(async (filters?: {
     minAltitude?: number;
@@ -306,38 +158,10 @@ export const useFlights = () => {
           lastUpdate: new Date(f.updatedAt ?? Date.now()),
           path: Array.isArray(f.history) ? f.history.map((h: any) => [Number(h.lat), Number(h.lng)] as [number, number]) : [],
         }));
-        
-        // Only update if there are actual changes to prevent unnecessary re-renders
-        setFlights(prevFlights => {
-          // Check if data has actually changed
-          if (prevFlights.length !== mapped.length) {
-            return mapped;
-          }
-          
-          // Check for significant changes in flight data
-          const hasChanges = mapped.some((newFlight, index) => {
-            const prevFlight = prevFlights[index];
-            if (!prevFlight) return true;
-            
-            return (
-              Math.abs(newFlight.latitude - prevFlight.latitude) > 0.005 ||
-              Math.abs(newFlight.longitude - prevFlight.longitude) > 0.005 ||
-              Math.abs(newFlight.altitude - prevFlight.altitude) > 10 ||
-              Math.abs(newFlight.speed - prevFlight.speed) > 5 ||
-              Math.abs(newFlight.heading - prevFlight.heading) > 1 ||
-              newFlight.flightNumber !== prevFlight.flightNumber
-            );
-          });
-          
-          if (hasChanges) {
-            setLastUpdate(new Date());
-            return mapped;
-          }
-          
-          // No significant changes, return previous state
-          return prevFlights;
-        });
-        
+
+        // Always update flights from WebSocket - prioritize real-time data
+        setFlights(mapped);
+        setLastUpdate(new Date());
         hasReceivedInitialDataRef.current = true;
       } catch (error) {
         // Silent error handling for flight data processing
@@ -346,10 +170,9 @@ export const useFlights = () => {
     });
 
     return () => {
-      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
       socket.disconnect();
     };
-  }, [applyBufferedUpdate]);
+  }, []);
 
   return {
     flights,

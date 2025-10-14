@@ -6,7 +6,7 @@
 // Application configuration
 export const APP_CONFIG = {
   DEFAULT_FLIGHT_COUNT: Number.MAX_SAFE_INTEGER, // Set to maximum for unlimited flights
-  UPDATE_INTERVAL: 10000, // Increased from 3000 to 10000 for more stable updates
+  UPDATE_INTERVAL: 5000, // Set to 5 seconds for more responsive updates
   MAX_HISTORY_LENGTH: 50,
   ICON_CACHE_BUCKET_SIZE: 15, // Degrees
   THROTTLE_INTERVAL: 300, // Milliseconds

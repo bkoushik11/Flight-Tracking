@@ -1,10 +1,14 @@
-require("dotenv").config();
+// require("dotenv").config();
+require("dotenv").config({ path: __dirname + '/.env' });
 const http = require("http");
 const { Server } = require("socket.io");
 const app = require("./app");
 const database = require("./config/database");
 const flightService = require("./services/flights/flightService");
 const FlightsGateway = require("./sockets/flights.gateway");
+const FlightPosition = require("./models/FlightPosition");
+const { isRecordingFlight } = require("./services/recordingState");
+const path = require('path');
 
 const { CONFIG } = require("./utils/constants");
 const PORT = CONFIG.PORT;
@@ -59,8 +63,8 @@ const checkAndBroadcastFlightChanges = async () => {
     // Always update flight histories and broadcast to ensure real-time updates
     console.log(`📤 Sent ${currentFlights.length} flights to client`);
     
-    // Always update individual flight histories
-    currentFlights.forEach(flight => {
+    // Always update individual flight histories and persist to DB
+    const persistPromises = currentFlights.map(async (flight) => {
       const nowTs = Date.now();
       const position = { lat: flight.lat, lng: flight.lng, alt: flight.altitude, ts: nowTs };
       if (!flightService.flightHistories.has(flight.id)) {
@@ -72,7 +76,26 @@ const checkAndBroadcastFlightChanges = async () => {
         arr.splice(0, arr.length - 500);
       }
       flight.history = arr.map(p => ({ lat: p.lat, lng: p.lng, ts: p.ts }));
+
+      // Persist only for flights that are actively being recorded
+      if (isRecordingFlight(flight.id)) {
+        try {
+          await FlightPosition.addPositionIfChanged(
+            String(flight.id),
+            Number(flight.lat),
+            Number(flight.lng),
+            Number(flight.heading || 0),
+            Number(flight.altitude || 0),
+            Number(flight.speed || 0)
+          );
+        } catch (persistError) {
+          console.error(`Failed to persist position for flight ${flight.id}:`, persistError.message);
+        }
+      }
     });
+
+    // Do not block broadcasting if persistence is slow; wait in background
+    Promise.allSettled(persistPromises).catch(() => {});
     
     // Always broadcast current flights to keep clients updated
     flightsGateway.broadcastFlightUpdate(currentFlights);
@@ -96,6 +119,14 @@ const checkAndBroadcastFlightChanges = async () => {
     isCheckingForChanges = false;
   }
 };
+
+
+
+// Serve static files from the React app build directory
+app.get(/.*/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../Frontend/build', 'index.html'));
+});
+
 
 // Function to compare flight data for changes with tolerance
 const hasFlightDataChanged = (prevFlights, currentFlights) => {
@@ -129,9 +160,9 @@ const hasFlightDataChanged = (prevFlights, currentFlights) => {
   return hasChanges;
 };
 
-// Set up periodic flight fetching every 30 seconds (reduced frequency)
-console.log('Setting up periodic flight fetching every 30 seconds');
-setInterval(checkAndBroadcastFlightChanges, 30000);
+// Set up periodic flight fetching every 5 seconds (reduced frequency)
+console.log('Setting up periodic flight fetching every 5 seconds');
+setInterval(checkAndBroadcastFlightChanges, CONFIG.TICK_MS);
 
 // Initial fetch - only do this once on startup
 checkAndBroadcastFlightChanges();

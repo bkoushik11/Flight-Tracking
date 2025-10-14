@@ -63,20 +63,9 @@ function App() {
     if (!selectedFlight) return;
     const latest = flights.find(f => f.id === selectedFlight.id);
     if (latest) {
-      // Check if there are significant changes before updating
-      const hasChanges = (
-        Math.abs(latest.latitude - selectedFlight.latitude) > 0.005 ||
-        Math.abs(latest.longitude - selectedFlight.longitude) > 0.005 ||
-        Math.abs(latest.altitude - selectedFlight.altitude) > 10 ||
-        Math.abs(latest.speed - selectedFlight.speed) > 5 ||
-        Math.abs(latest.heading - selectedFlight.heading) > 1 ||
-        latest.flightNumber !== selectedFlight.flightNumber
-      );
-      
-      if (hasChanges) {
-        // Create a new object to ensure React detects changes
-        setSelectedFlight({...latest, lastUpdate: new Date()});
-      }
+      // Always update the selected flight with the latest data to ensure real-time updates
+      // Create a new object to ensure React detects changes
+      setSelectedFlight({...latest, lastUpdate: new Date()});
     }
   }, [flights, selectedFlight]);
 
@@ -165,7 +154,7 @@ function App() {
               <PathTrackPage 
                 flights={memoizedFlights}
                 onBack={handleBackToMap}
-                onLogout={handleLogout}
+                // onLogout={handleLogout}
               />
             </ErrorBoundary>
           </ProtectedRoute>

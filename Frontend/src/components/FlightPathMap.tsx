@@ -4,6 +4,8 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { INDIAN_AIRPORTS } from './IndianAirports';
 import { ActiveTileLayer, useMapLayer } from './Layers';
+import { MapPin } from 'lucide-react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 // Component to handle map events
 const MapEvents: React.FC<{ onClick?: () => void }> = ({ onClick }) => {
@@ -137,7 +139,7 @@ const createAirplaneIcon = (heading: number, isSelected?: boolean) => {
         display: flex; 
         align-items: center; 
         justify-content: center;
-        transform: rotate(${heading}deg);
+        transform: rotate(${heading-85}deg);
       ">
         <div style="
           font-size: 24px;
@@ -152,47 +154,66 @@ const createAirplaneIcon = (heading: number, isSelected?: boolean) => {
   });
 };
 
-// Create general airport icon with name
 const createGeneralAirportIcon = (airportName: string) => {
+  const mapPinIcon = renderToStaticMarkup(
+    <div className="relative">
+      <MapPin className="text-blue-500" size={20} />
+      <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white text-xs font-bold px-1 py-0.5 rounded whitespace-nowrap">
+        {airportName}
+      </div>
+    </div>
+  );
+
   return L.divIcon({
     className: 'custom-airport-icon',
-    html: `
-      <div style="
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      ">
-        <div style="
-          width: 12px; 
-          height: 12px; 
-          background: #3b82f6; 
-          border-radius: 50%; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center;
-          border: 2px solid white;
-          box-shadow: 0 0 3px rgba(0,0,0,0.5);
-        ">
-        </div>
-        <div style="
-          margin-top: 1px;
-          padding: 1px 3px;
-          background: #3b82f6;
-          color: white;
-          font-size: 9px;
-          font-weight: bold;
-          border-radius: 2px;
-          white-space: nowrap;
-          max-width: 60px;
-          text-align: center;
-          line-height: 1.1;
-        ">${airportName}</div>
-      </div>
-    `,
-    iconSize: [16, 25],
-    iconAnchor: [8, 20],
+    html: mapPinIcon,
+    iconSize: [20, 40],
+    iconAnchor: [10, 40],
   });
 };
+
+
+// Create general airport icon with name
+// const createGeneralAirportIcon = (airportName: string) => {
+  // return L.divIcon({
+  //   className: 'custom-airport-icon',
+  //   html: `
+  //     <div style="
+  //       display: flex;
+  //       flex-direction: column;
+  //       align-items: center;
+  //     ">
+  //       <div style="
+  //         width: 12px; 
+  //         height: 12px; 
+  //         background: #3b82f6; 
+  //         border-radius: 50%; 
+  //         display: flex; 
+  //         align-items: center; 
+  //         justify-content: center;
+  //         border: 2px solid white;
+  //         box-shadow: 0 0 3px rgba(0,0,0,0.5);
+  //       ">
+  //       </div>
+//         <div style="
+//           margin-top: 1px;
+//           padding: 1px 3px;
+//           background: #3b82f6;
+//           color: white;
+//           font-size: 9px;
+//           font-weight: bold;
+//           border-radius: 2px;
+//           white-space: nowrap;
+//           max-width: 60px;
+//           text-align: center;
+//           line-height: 1.1;
+//         ">${airportName}</div>
+//       </div>
+//     `,
+//     iconSize: [16, 25],
+//     iconAnchor: [8, 20],
+//   });
+// };
 
 // Default center is handled by getInitialView fallback
 

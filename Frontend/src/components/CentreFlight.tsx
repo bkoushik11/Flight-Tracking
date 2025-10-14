@@ -37,49 +37,52 @@ const CentreFlight: React.FC<CentreFlightProps> = ({ selectedFlight, isActive, s
   const hasCenteredRef = useRef(false);
   const lastFlightIdRef = useRef<string | null>(null);
   const lastPanelStateRef = useRef<boolean | undefined>(undefined);
+  const lastCenteredPosRef = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     // Only center if component is active and we have a selected flight
     if (!isActive || !selectedFlight) {
       hasCenteredRef.current = false;
+      lastCenteredPosRef.current = null;
       return;
     }
 
-    // Check if this is a new flight selection or panel state changed
+    // Detect new selection or panel change
     const isNewFlight = lastFlightIdRef.current !== selectedFlight.id;
     const panelStateChanged = lastPanelStateRef.current !== showLeftPanel;
-    
     if (isNewFlight || panelStateChanged) {
       lastFlightIdRef.current = selectedFlight.id;
       lastPanelStateRef.current = showLeftPanel;
       hasCenteredRef.current = false;
+      lastCenteredPosRef.current = null;
     }
 
-    // Center the flight if we haven't done so for this flight yet
-    if (!hasCenteredRef.current && selectedFlight.latitude && selectedFlight.longitude) {
-      try {
-        const flightPosition: [number, number] = [selectedFlight.latitude, selectedFlight.longitude];
-        
-        // Center the map on the flight with a good zoom level
-        // Standard Leaflet maps are always oriented with north up
-        map.setView(flightPosition, 12, { 
-          animate: true, 
-          duration: 1.0 
-        });
-        
-        // Trigger map resize to handle split view properly
-        setTimeout(() => {
-          map.invalidateSize();
-        }, 100);
-        
-        // Mark as centered for this flight
+    // Follow the flight: keep it centered as it moves
+    const { latitude, longitude } = selectedFlight;
+    if (!Number.isFinite(latitude as number) || !Number.isFinite(longitude as number)) {
+      return;
+    }
+
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    const prior = lastCenteredPosRef.current;
+    const movedEnough = !prior || Math.abs(prior.lat - lat) > 0.005 || Math.abs(prior.lng - lng) > 0.005;
+
+    try {
+      if (!hasCenteredRef.current) {
+        // First time centering for this selection: set a good zoom
+        map.setView([lat, lng], 12, { animate: true, duration: 0.8 });
         hasCenteredRef.current = true;
-        
-        console.log(`Centered map on flight ${selectedFlight.flightNumber} at position:`, flightPosition);
-        console.log(`Flight heading: ${selectedFlight.heading}°, Map oriented to north`);
-      } catch (error) {
-        console.error('Error centering flight on map:', error);
+        lastCenteredPosRef.current = { lat, lng };
+        setTimeout(() => map.invalidateSize(), 100);
+      } else if (movedEnough) {
+        // Subsequent updates: keep current zoom while recentering
+        const currentZoom = map.getZoom();
+        map.setView([lat, lng], currentZoom, { animate: true, duration: 0.6 });
+        lastCenteredPosRef.current = { lat, lng };
       }
+    } catch (error) {
+      console.error('Error maintaining flight centering:', error);
     }
   }, [selectedFlight, isActive, showLeftPanel, map]);
 
@@ -89,6 +92,7 @@ const CentreFlight: React.FC<CentreFlightProps> = ({ selectedFlight, isActive, s
       hasCenteredRef.current = false;
       lastFlightIdRef.current = null;
       lastPanelStateRef.current = undefined;
+      lastCenteredPosRef.current = null;
     }
   }, [isActive]);
 

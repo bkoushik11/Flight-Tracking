@@ -1,4 +1,5 @@
 const flightService = require("../services/flights/flightService");
+const { CONFIG } = require("../utils/constants");
 
 class FlightsGateway {
   constructor(io) {
@@ -51,8 +52,8 @@ class FlightsGateway {
     const clientInfo = this.connectedClients.get(socket.id);
     
     if (clientInfo) {
-      if (now - clientInfo.lastRequestTime < 120000) {
-        const secondsRemaining = Math.ceil((120000 - (now - clientInfo.lastRequestTime)) / 1000);
+      if (now - clientInfo.lastRequestTime < CONFIG.TICK_MS) {
+        const secondsRemaining = Math.ceil((CONFIG.TICK_MS - (now - clientInfo.lastRequestTime)) / 1000);
         console.log(`Client ${socket.id} requesting too frequently (${secondsRemaining}s left)`);
         socket.emit("error", { 
           message: `Please wait ${secondsRemaining} seconds before requesting flights again` 
@@ -83,8 +84,8 @@ class FlightsGateway {
     const clientInfo = this.connectedClients.get(socket.id);
     
     if (clientInfo) {
-      if (now - clientInfo.lastRequestTime < 120000) {
-        const secondsRemaining = Math.ceil((120000 - (now - clientInfo.lastRequestTime)) / 1000);
+      if (now - clientInfo.lastRequestTime < CONFIG.TICK_MS) {
+        const secondsRemaining = Math.ceil((CONFIG.TICK_MS - (now - clientInfo.lastRequestTime)) / 1000);
         console.log(`Client ${socket.id} requesting refresh too frequently (${secondsRemaining}s left)`);
         socket.emit("error", { 
           message: `Please wait ${secondsRemaining} seconds before refreshing flights` 

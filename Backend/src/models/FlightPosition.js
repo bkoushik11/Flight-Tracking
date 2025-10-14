@@ -45,27 +45,26 @@ const flightPositionSchema = new mongoose.Schema({
 });
 
 // FIFO Stack implementation - keep only last 5000 positions
-// STRICT: Only adds position if lat/lng coordinates have changed by at least 0.05°
+// Save positions when lat/long changes, handle floating point precision
 flightPositionSchema.methods.addPosition = function(lat, lng, heading, altitude, speed) {
   // Check if this is the first position or if coordinates have changed
   const lastPosition = this.positions[this.positions.length - 1];
   
-  // Coordinate change detection threshold (degrees)
+  // Handle floating point precision issues - check if coordinates have changed
   const hasPositionChanged = !lastPosition || 
-    Math.abs(lastPosition.latitude - lat) > 0.05 || 
-    Math.abs(lastPosition.longitude - lng) > 0.05;  
+    Math.abs(lastPosition.latitude - lat) > 1e-10 || 
+    Math.abs(lastPosition.longitude - lng) > 1e-10;
 
-  // CRITICAL: Only proceed if coordinates have actually changed
   if (!hasPositionChanged) {
-    // Return without saving - this prevents MongoDB write operations
+    // Return without saving if coordinates haven't changed (within precision tolerance)
     return Promise.resolve({
       saved: false,
-      reason: 'Coordinates unchanged',
+      reason: 'Coordinates unchanged (within precision tolerance)',
       document: this
     });
   }
 
-  // Only create new position if coordinates changed
+  // Create new position when coordinates change
   const newPosition = {
     latitude: lat,
     longitude: lng,
@@ -74,8 +73,6 @@ flightPositionSchema.methods.addPosition = function(lat, lng, heading, altitude,
     speed: speed || 0,
     timestamp: new Date()
   };
-
-  // Minimal logging only when needed in debug environments
 
   // Add new position to array
   this.positions.push(newPosition);
@@ -88,7 +85,7 @@ flightPositionSchema.methods.addPosition = function(lat, lng, heading, altitude,
   // Update timestamp
   this.updatedAt = new Date();
   
-  // SAVE TO MONGODB only when coordinates changed
+  // SAVE TO MONGODB
   return this.save().then(savedDoc => ({
     saved: true,
     reason: 'Coordinates changed',
@@ -97,7 +94,7 @@ flightPositionSchema.methods.addPosition = function(lat, lng, heading, altitude,
   }));
 };
 
-// Enhanced method to check if position should be added with detailed info
+// Method to check if position should be added - handle floating point precision
 flightPositionSchema.methods.shouldAddPosition = function(lat, lng) {
   const lastPosition = this.positions[this.positions.length - 1];
   
@@ -109,17 +106,19 @@ flightPositionSchema.methods.shouldAddPosition = function(lat, lng) {
     };
   }
   
-  const latChange = Math.abs(lastPosition.latitude - lat);
-  const lngChange = Math.abs(lastPosition.longitude - lng);
-  const hasPositionChanged = latChange > 0.05 || lngChange > 0.05;
+  // Handle floating point precision issues
+  const latDiff = Math.abs(lastPosition.latitude - lat);
+  const lngDiff = Math.abs(lastPosition.longitude - lng);
+  const latChanged = latDiff > 1e-10;
+  const lngChanged = lngDiff > 1e-10;
+  const hasPositionChanged = latChanged || lngChanged;
   
   return {
     shouldAdd: hasPositionChanged,
-    reason: hasPositionChanged ? 'Coordinates changed significantly' : 'Coordinates unchanged',
+    reason: hasPositionChanged ? 'Coordinates changed' : 'Coordinates unchanged (within precision tolerance)',
     changes: {
-      latitude: latChange,
-      longitude: lngChange,
-      threshold: 0.05
+      latitude: latChanged ? `changed by ${latDiff}` : 'unchanged',
+      longitude: lngChanged ? `changed by ${lngDiff}` : 'unchanged'
     }
   };
 };
@@ -167,13 +166,13 @@ flightPositionSchema.statics.getFlightPositions = async function(flightId) {
   return flightPosition ? flightPosition.getPositionsArray() : [];
 };
 
-// ENHANCED: Static method with strict coordinate change detection
+// Save position when lat/long changes, handle floating point precision
 flightPositionSchema.statics.addPositionIfChanged = async function(flightId, lat, lng, heading, altitude, speed) {
   try {
     // Get or create flight position document
     const flightPosition = await this.findOrCreate(flightId);
     
-    // Check if we should add this position
+    // Check if we should add this position (handle floating point precision)
     const shouldAddCheck = flightPosition.shouldAddPosition(lat, lng);
     
     if (!shouldAddCheck.shouldAdd) {

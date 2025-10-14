@@ -1,94 +1,90 @@
-const express = require('express');
-const axios = require('axios');
-require('dotenv').config();
+// const express = require('express');
+// const axios = require('axios');
+// require('dotenv').config();
 
-const app = express();
+// const app = express();
 
-const OPENSKY_API_BASE = 'https://opensky-network.org/api/states/all';
-const TOKEN_URL = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
+// const TOKEN_URL = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
+// const OPENSKY_CLIENT_ID = process.env.OPENSKY_CLIENT_ID;
+// const OPENSKY_CLIENT_SECRET = process.env.OPENSKY_CLIENT_SECRET;
 
-const OPENSKY_CLIENT_ID = process.env.OPENSKY_CLIENT_ID;
-const OPENSKY_CLIENT_SECRET = process.env.OPENSKY_CLIENT_SECRET;
+// let cachedToken = null;
+// let tokenExpiry = null;
 
-// 🔹 Cache token to avoid fetching every request
-let cachedToken = null;
-let tokenExpiry = null;
+// // Get or reuse OpenSky OAuth token
+// async function getAccessToken() {
+//   const now = Date.now();
+//   if (cachedToken && tokenExpiry && now < tokenExpiry - 120000) {
+//     return cachedToken;
+//   }
 
-// 🔸 Function to get or refresh token
-async function getAccessToken() {
-  const now = Date.now();
+//   const params = new URLSearchParams();
+//   params.append('grant_type', 'client_credentials');
+//   params.append('client_id', OPENSKY_CLIENT_ID);
+//   params.append('client_secret', OPENSKY_CLIENT_SECRET);
 
-  // Reuse token if still valid (within 2 minutes of expiry)
-  if (cachedToken && tokenExpiry && now < tokenExpiry - 120000) {
-    return cachedToken;
-  }
+//   try {
+//     const response = await axios.post(TOKEN_URL, params, {
+//       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+//     });
+//     cachedToken = response.data.access_token;
+//     tokenExpiry = now + response.data.expires_in * 1000;
+//     console.log('✅ OpenSky token fetched successfully');
+//     return cachedToken;
+//   } catch (err) {
+//     console.error('❌ Error fetching token:', err.response?.data || err.message);
+//     throw new Error('Failed to fetch OpenSky access token');
+//   }
+// }
 
-  const params = new URLSearchParams();
-  params.append('grant_type', 'client_credentials');
-  params.append('client_id', OPENSKY_CLIENT_ID);
-  params.append('client_secret', OPENSKY_CLIENT_SECRET);
+// // India bounding box
+// const INDIA_BOUNDS = { lamin: 6, lamax: 37, lomin: 68, lomax: 97 };
 
-  try {
-    const response = await axios.post(TOKEN_URL, params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
+// // Live flights over India (authenticated)
+// app.get('/api/live-flights', async (req, res) => {
+//   try {
+//     const token = await getAccessToken();
 
-    cachedToken = response.data.access_token;
-    tokenExpiry = now + response.data.expires_in * 1000;
-    console.log('OpenSky token fetched successfully');
-    return cachedToken;
-  } catch (err) {
-    console.error('Error fetching token:', err.response?.data || err.message);
-    throw new Error('Failed to fetch OpenSky access token');
-  }
-}
+//     const response = await axios.get('https://opensky-network.org/api/states/all', {
+//       headers: { Authorization: `Bearer ${token}` }
+//     });
 
-// 🛫 Route to get live flight positions
-app.get('/api/positions', async (req, res) => {
-  try {
-    const token = await getAccessToken();
+//     const states = response.data.states || [];
 
-    const response = await axios.get(OPENSKY_API_BASE, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-        'User-Agent': 'Flight-Tracker-App/1.0',
-      },
-      timeout: 15000,
-    });
+//     const indiaFlights = states
+//       .filter(f => {
+//         const lat = f[6];
+//         const lon = f[5];
+//         return lat >= INDIA_BOUNDS.lamin &&
+//                lat <= INDIA_BOUNDS.lamax &&
+//                lon >= INDIA_BOUNDS.lomin &&
+//                lon <= INDIA_BOUNDS.lomax;
+//       })
+//       .map(f => ({
+//         icao24: f[0],
+//         callsign: f[1]?.trim() || 'UNKNOWN',
+//         origin_country: f[2],
+//         time_position: f[3],
+//         last_contact: f[4],
+//         longitude: f[5],
+//         latitude: f[6],
+//         altitude: f[7],
+//         on_ground: f[8],
+//         velocity: f[9],
+//         heading: f[10],
+//         vertical_rate: f[11]
+//       }));
 
-    const data = response.data;
-    if (!data.states) {
-      return res.status(500).json({ error: 'No state data returned from OpenSky' });
-    }
+//     res.json({
+//       total_flights: indiaFlights.length,
+//       flights: indiaFlights
+//     });
 
-    // Transform and return flight data
-    const positions = data.states.map((flight) => ({
-      icao: flight[0],
-      longitude: flight[5],
-      latitude: flight[6],
-      altitude: flight[7],
-      velocity: flight[9],
-    }));
+//   } catch (err) {
+//     console.error('❌ Error fetching live flights:', err.message);
+//     res.status(500).json({ error: 'Failed to fetch live flights' });
+//   }
+// });
 
-    res.json(positions);
-  } catch (error) {
-    console.error('Error fetching flight data:', error.message);
-    
-
-    const status = error.response?.status || 500;
-    const message =
-      status === 401
-        ? 'Unauthorized – check your OpenSky credentials'
-        : status === 403
-        ? 'Forbidden – you may not have access'
-        : status === 429
-        ? 'Rate limit exceeded – try again later'
-        : 'Server error fetching flight data';
-
-    res.status(status).json({ error: message });
-  }
-});
-
-const port = 3000;
-app.listen(port, () => console.log(`Server running at http://localhost:${port}`));
+// const port = 3000;
+// app.listen(port, () => console.log(`🚀 Server running at http://localhost:${port}`));

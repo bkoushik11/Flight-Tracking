@@ -35,6 +35,7 @@ const MapPageInner: React.FC<MapPageProps> = ({
   const [drawnRectangles, setDrawnRectangles] = useState<L.LatLngBounds[]>([]);
   const [isDrawingActive, setIsDrawingActive] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState<number>(0);
   const recordingFlightIdRef = useRef<string | null>(null);
   const recordTimerRef = useRef<number | null>(null);
   // const navigate = useNavigate();
@@ -170,6 +171,7 @@ const MapPageInner: React.FC<MapPageProps> = ({
         window.clearInterval(recordTimerRef.current);
         recordTimerRef.current = null;
       }
+      setRecordSeconds(0);
       return;
     }
     // Start: require a selected flight
@@ -187,10 +189,13 @@ const MapPageInner: React.FC<MapPageProps> = ({
     try {
       await startRecording(selectedFlight.id);
       setIsRecording(true);
+      setRecordSeconds(0);
       recordingFlightIdRef.current = selectedFlight.id;
       // poll every 3s to append current selected flight position, even if user clicks other flights
       if (recordTimerRef.current) window.clearInterval(recordTimerRef.current);
       recordTimerRef.current = window.setInterval(async () => {
+        // tick seconds display
+        setRecordSeconds((s) => s + 1);
         const fid = recordingFlightIdRef.current;
         if (!fid) return;
         // Find latest position for that flight from flights stream
@@ -206,7 +211,7 @@ const MapPageInner: React.FC<MapPageProps> = ({
             speed: f.speed
           });
         } catch {}
-      }, 3000);
+      }, 1000);
     } catch (e) {
       // show error
       const notificationId = `rec-err-${Date.now()}`;
@@ -331,7 +336,7 @@ const MapPageInner: React.FC<MapPageProps> = ({
           </div>
 
           {/* Record Button - Bottom left */}
-          <div className="absolute bottom-4 left-4 z-[1000]">
+          <div className="absolute bottom-4 left-4 z-[1000] flex items-center gap-2">
             <button
               onClick={handleToggleRecording}
               className={`px-3 py-2 rounded-lg shadow-lg text-sm border transition-all ${
@@ -343,6 +348,9 @@ const MapPageInner: React.FC<MapPageProps> = ({
             >
               {isRecording ? 'Stop' : 'Record'}
             </button>
+            {isRecording && (
+              <span className="text-white text-sm font-mono">{recordSeconds}s</span>
+            )}
           </div>
           
           {/* Latitude and Longitude Display - Positioned at same level as zoom controls */}
