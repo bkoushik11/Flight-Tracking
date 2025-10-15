@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import {useNavigate} from 'react-router-dom';
 import { FlightMap } from '../components/FlightMap';
 import { Layers, MapLayerProvider } from '../components/Layers';
 import { LeftPanel } from '../components/LeftPanel';
@@ -27,7 +28,7 @@ const MapPageInner: React.FC<MapPageProps> = ({
   selectedFlight,
   onBackToMap,
   showLeftPanel,
-  onShowPathTrack
+  // onShowPathTrack
 }) => {
   const [mousePosition, setMousePosition] = useState<{ lat: number; lng: number } | null>(null);
   const [notifications, setNotifications] = useState<{id: string, message: string, type: string}[]>([]);
@@ -53,6 +54,12 @@ const MapPageInner: React.FC<MapPageProps> = ({
       return prev;
     });
   }, []);
+
+  const navigate = useNavigate();
+
+  const handlePathTrackClick = useCallback(() => {
+    navigate('/pathtrack');
+  }, [navigate]);
 
   // Function to show airport notification for a specific flight
   const showAirportNotification = useCallback((flight: Flight) => {
@@ -266,18 +273,17 @@ const MapPageInner: React.FC<MapPageProps> = ({
             </button>
           </div>
           
-          {/* PathTrack Nav Button */}
-          {onShowPathTrack && (
-            <div className="absolute top-4 right-2 z-[1000] mb-2">
-              <button
-                onClick={onShowPathTrack}
-                className="px-3 py-2 bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-md shadow-lg text-yellow-300 hover:bg-cyan-500/20 transition-all text-sm font-medium"
-                title="Go to Path Track"
-              >
-                Path Track
-              </button>
-            </div>
-          )}
+          {/* PathTrack Nav Button - use Link to ensure reliable SPA navigation */}
+                    {/* PathTrack Nav Button - use button with navigate for more reliable SPA navigation */}
+          <div className="absolute top-4 right-2 z-[1000] mb-2 pointer-events-auto">
+            <button
+              onClick={handlePathTrackClick}
+              className="px-3 py-2 bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-md shadow-lg text-yellow-300 hover:bg-cyan-500/20 transition-all text-sm font-medium"
+              title="Go to Path Track"
+            >
+              Path Track
+            </button>
+          </div>
           
           {/* Layers Control */}
           <div className="absolute top-16 right-2 z-[1000]">

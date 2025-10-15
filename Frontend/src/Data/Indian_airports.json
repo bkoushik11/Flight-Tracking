@@ -1,0 +1,1226 @@
+[
+    {
+      "name": "Indira Gandhi International Airport",
+      "ident": "VIDP",
+      "icao_code": "VIDP",
+      "latitude_deg": 28.55563,
+      "longitude_deg": 77.09519,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Chhatrapati Shivaji International Airport",
+      "ident": "VABB",
+      "icao_code": "VABB",
+      "latitude_deg": 19.0886993408,
+      "longitude_deg": 72.8678970337,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Chennai International Airport",
+      "ident": "VOMM",
+      "icao_code": "VOMM",
+      "latitude_deg": 12.990005,
+      "longitude_deg": 80.169296,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Kempegowda International Airport",
+      "ident": "VOBL",
+      "icao_code": "VOBL",
+      "latitude_deg": 13.1979,
+      "longitude_deg": 77.706299,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Netaji Subhash Chandra Bose International Airport",
+      "ident": "VECC",
+      "icao_code": "VECC",
+      "latitude_deg": 22.654699,
+      "longitude_deg": 88.446701,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Rajiv Gandhi International Airport",
+      "ident": "VOHS",
+      "icao_code": "VOHS",
+      "latitude_deg": 17.231318,
+      "longitude_deg": 78.429855,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Dabolim Airport",
+      "ident": "VOGO",
+      "icao_code": "VOGO",
+      "latitude_deg": 15.3808,
+      "longitude_deg": 73.831398,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Cochin International Airport",
+      "ident": "VOCI",
+      "icao_code": "VOCI",
+      "latitude_deg": 10.151047,
+      "longitude_deg": 76.400838,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Thiruvananthapuram International Airport",
+      "ident": "VOTV",
+      "icao_code": "VOTV",
+      "latitude_deg": 8.48212,
+      "longitude_deg": 76.920097,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Manohar International Airport",
+      "ident": "VOGA",
+      "icao_code": "VOGA",
+      "latitude_deg": 15.744257,
+      "longitude_deg": 73.860625,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Rajkot International Airport",
+      "ident": "VAHS",
+      "icao_code": "VAHS",
+      "latitude_deg": 22.378824,
+      "longitude_deg": 71.039391,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Navi Mumbai International Airport",
+      "ident": "IN-0276",
+      "icao_code": "VANM",
+      "latitude_deg": 18.984597,
+      "longitude_deg": 73.065253,
+      "country_name": "India",
+      "city": null
+    },
+    {
+      "name": "Sardar Vallabh Bhai Patel International Airport",
+      "ident": "VAAH",
+      "icao_code": "VAAH",
+      "latitude_deg": 23.0772,
+      "longitude_deg": 72.634697,
+      "country_name": "India",
+      "city": "Ahmedabad"
+    },
+    {
+      "name": "Jaipur International Airport",
+      "ident": "VIJP",
+      "icao_code": "VIJP",
+      "latitude_deg": 26.8242,
+      "longitude_deg": 75.812202,
+      "country_name": "India",
+      "city": "Jaipur"
+    },
+    {
+      "name": "Pune Airport / Lohagaon Air Force Station",
+      "ident": "VAPO",
+      "icao_code": "VAPO",
+      "latitude_deg": 18.5821,
+      "longitude_deg": 73.919701,
+      "country_name": "India",
+      "city": "Pune"
+    },
+    {
+      "name": "Lal Bahadur Shastri Airport",
+      "ident": "VEBN",
+      "icao_code": "VEBN",
+      "latitude_deg": 25.452129,
+      "longitude_deg": 82.861805,
+      "country_name": "India",
+      "city": "Varanasi"
+    },
+    {
+      "name": "HAL Airport",
+      "ident": "VOBG",
+      "icao_code": "",
+      "latitude_deg": 12.95,
+      "longitude_deg": 77.668198,
+      "country_name": "India",
+      "city": "Bangalore"
+    },
+    {
+      "name": "Sri Guru Ram Dass Jee International Airport",
+      "ident": "VIAR",
+      "icao_code": "VIAR",
+      "latitude_deg": 31.7096,
+      "longitude_deg": 74.797302,
+      "country_name": "India",
+      "city": "Amritsar"
+    },
+    {
+      "name": "Vadodara Airport",
+      "ident": "VABO",
+      "icao_code": "VABO",
+      "latitude_deg": 22.336201,
+      "longitude_deg": 73.226303,
+      "country_name": "India",
+      "city": "Vadodara"
+    },
+    {
+      "name": "Biju Patnaik International Airport",
+      "ident": "VEBS",
+      "icao_code": "VEBS",
+      "latitude_deg": 20.2444,
+      "longitude_deg": 85.817802,
+      "country_name": "India",
+      "city": "Bhubaneswar"
+    },
+    {
+      "name": "Chaudhary Charan Singh International Airport",
+      "ident": "VILK",
+      "icao_code": "VILK",
+      "latitude_deg": 26.7605991364,
+      "longitude_deg": 80.8892974854,
+      "country_name": "India",
+      "city": "Lucknow"
+    },
+    {
+      "name": "Mangalore International Airport",
+      "ident": "VOML",
+      "icao_code": "VOML",
+      "latitude_deg": 12.9612998962,
+      "longitude_deg": 74.8900985718,
+      "country_name": "India",
+      "city": "Mangalore"
+    },
+    {
+      "name": "Visakhapatnam Airport",
+      "ident": "VEVZ",
+      "icao_code": "VOVZ",
+      "latitude_deg": 17.723506,
+      "longitude_deg": 83.227729,
+      "country_name": "India",
+      "city": "Visakhapatnam"
+    },
+    {
+      "name": "Coimbatore International Airport",
+      "ident": "VOCB",
+      "icao_code": "VOCB",
+      "latitude_deg": 11.029999733,
+      "longitude_deg": 77.0434036255,
+      "country_name": "India",
+      "city": "Coimbatore"
+    },
+    {
+      "name": "Calicut International Airport",
+      "ident": "VOCL",
+      "icao_code": "VOCL",
+      "latitude_deg": 11.1368,
+      "longitude_deg": 75.955299,
+      "country_name": "India",
+      "city": "Calicut"
+    },
+    {
+      "name": "Jodhpur Airport",
+      "ident": "VIJO",
+      "icao_code": "VIJO",
+      "latitude_deg": 26.251100540161133,
+      "longitude_deg": 73.04889678955078,
+      "country_name": "India",
+      "city": "Jodhpur"
+    },
+    {
+      "name": "Veer Savarkar International Airport / INS Utkrosh",
+      "ident": "VOPB",
+      "icao_code": "VOPB",
+      "latitude_deg": 11.641208,
+      "longitude_deg": 92.729643,
+      "country_name": "India",
+      "city": "Port Blair"
+    },
+    {
+      "name": "Begumpet Airport",
+      "ident": "VOHY",
+      "icao_code": "VOHY",
+      "latitude_deg": 17.4531,
+      "longitude_deg": 78.467598,
+      "country_name": "India",
+      "city": "Hyderabad"
+    },
+    {
+      "name": "Chandigarh International Airport",
+      "ident": "VICG",
+      "icao_code": "VICG",
+      "latitude_deg": 30.6735,
+      "longitude_deg": 76.788498,
+      "country_name": "India",
+      "city": "Chandigarh"
+    },
+    {
+      "name": "Lokpriya Gopinath Bordoloi International Airport",
+      "ident": "VEGT",
+      "icao_code": "VEGT",
+      "latitude_deg": 26.10610008239746,
+      "longitude_deg": 91.58589935302734,
+      "country_name": "India",
+      "city": "Guwahati"
+    },
+    {
+      "name": "Leh Kushok Bakula Rimpochee Airport",
+      "ident": "VILH",
+      "icao_code": "VILH",
+      "latitude_deg": 34.135899,
+      "longitude_deg": 77.546501,
+      "country_name": "India",
+      "city": "Leh"
+    },
+    {
+      "name": "Bagdogra Airport",
+      "ident": "VEBD",
+      "icao_code": "VEBD",
+      "latitude_deg": 26.68120002746582,
+      "longitude_deg": 88.32859802246094,
+      "country_name": "India",
+      "city": "Siliguri"
+    },
+    {
+      "name": "Devi Ahilyabai Holkar Airport",
+      "ident": "VAID",
+      "icao_code": "VAID",
+      "latitude_deg": 22.7217998505,
+      "longitude_deg": 75.8011016846,
+      "country_name": "India",
+      "city": "Indore"
+    },
+    {
+      "name": "Maharana Pratap Airport",
+      "ident": "VAUD",
+      "icao_code": "VAUD",
+      "latitude_deg": 24.6177005768,
+      "longitude_deg": 73.89610290530001,
+      "country_name": "India",
+      "city": "Udaipur"
+    },
+    {
+      "name": "Madurai Airport",
+      "ident": "VOMD",
+      "icao_code": "VOMD",
+      "latitude_deg": 9.83450984955,
+      "longitude_deg": 78.09339904790001,
+      "country_name": "India",
+      "city": "Madurai"
+    },
+    {
+      "name": "Jay Prakash Narayan Airport",
+      "ident": "VEPT",
+      "icao_code": "VEPT",
+      "latitude_deg": 25.591299,
+      "longitude_deg": 85.087997,
+      "country_name": "India",
+      "city": "Patna"
+    },
+    {
+      "name": "Sheikh ul Alam International Airport",
+      "ident": "VISR",
+      "icao_code": "VISR",
+      "latitude_deg": 33.987099,
+      "longitude_deg": 74.7742,
+      "country_name": "India",
+      "city": "Srinagar"
+    },
+    {
+      "name": "Surat Airport",
+      "ident": "VASU",
+      "icao_code": "VASU",
+      "latitude_deg": 21.1141,
+      "longitude_deg": 72.741798,
+      "country_name": "India",
+      "city": "Surat"
+    },
+    {
+      "name": "Dr. Babasaheb Ambedkar International Airport",
+      "ident": "VANP",
+      "icao_code": "VANP",
+      "latitude_deg": 21.092199,
+      "longitude_deg": 79.047203,
+      "country_name": "India",
+      "city": "Nagpur"
+    },
+    {
+      "name": "Raja Bhoj International Airport",
+      "ident": "VABP",
+      "icao_code": "VABP",
+      "latitude_deg": 23.2875003815,
+      "longitude_deg": 77.3374023438,
+      "country_name": "India",
+      "city": "Bhopal"
+    },
+    {
+      "name": "Bhuj Airport",
+      "ident": "VABJ",
+      "icao_code": "VABJ",
+      "latitude_deg": 23.2877998352,
+      "longitude_deg": 69.6701965332,
+      "country_name": "India",
+      "city": "Bhuj"
+    },
+    {
+      "name": "Vijayawada Airport",
+      "ident": "VOBZ",
+      "icao_code": "VOBZ",
+      "latitude_deg": 16.530399,
+      "longitude_deg": 80.796799,
+      "country_name": "India",
+      "city": "Gannavaram"
+    },
+    {
+      "name": "Aurangabad Airport",
+      "ident": "VAAU",
+      "icao_code": "VAAU",
+      "latitude_deg": 19.862699508666992,
+      "longitude_deg": 75.39810180664062,
+      "country_name": "India",
+      "city": "Aurangabad"
+    },
+    {
+      "name": "Imphal Airport",
+      "ident": "VEIM",
+      "icao_code": "VEIM",
+      "latitude_deg": 24.7600002289,
+      "longitude_deg": 93.896697998,
+      "country_name": "India",
+      "city": "Imphal"
+    },
+    {
+      "name": "Jammu Airport",
+      "ident": "VIJU",
+      "icao_code": "VIJU",
+      "latitude_deg": 32.688849,
+      "longitude_deg": 74.838152,
+      "country_name": "India",
+      "city": "Jammu"
+    },
+    {
+      "name": "Birsa Munda Airport",
+      "ident": "VERC",
+      "icao_code": "VERC",
+      "latitude_deg": 23.314300537100003,
+      "longitude_deg": 85.3217010498,
+      "country_name": "India",
+      "city": "Ranchi"
+    },
+    {
+      "name": "Agra Airport / Agra Air Force Station",
+      "ident": "VIAG",
+      "icao_code": "VIAG",
+      "latitude_deg": 27.157683,
+      "longitude_deg": 77.960942,
+      "country_name": "India",
+      "city": "Agra"
+    },
+    {
+      "name": "Kullu Manali Airport",
+      "ident": "VIBR",
+      "icao_code": "VIBR",
+      "latitude_deg": 31.876699,
+      "longitude_deg": 77.154404,
+      "country_name": "India",
+      "city": "Bhuntar"
+    },
+    {
+      "name": "Dibrugarh Airport",
+      "ident": "VEMN",
+      "icao_code": "VEMN",
+      "latitude_deg": 27.4839000702,
+      "longitude_deg": 95.0168991089,
+      "country_name": "India",
+      "city": "Dibrugarh"
+    },
+    {
+      "name": "Kannur International Airport",
+      "ident": "VOKN",
+      "icao_code": "VOKN",
+      "latitude_deg": 11.918614,
+      "longitude_deg": 75.547211,
+      "country_name": "India",
+      "city": "Kannur"
+    },
+    {
+      "name": "Swami Vivekananda Airport",
+      "ident": "VARP",
+      "icao_code": "",
+      "latitude_deg": 21.180401,
+      "longitude_deg": 81.7388,
+      "country_name": "India",
+      "city": "Raipur"
+    },
+    {
+      "name": "Agartala - Maharaja Bir Bikram Airport",
+      "ident": "VEAT",
+      "icao_code": "VEAT",
+      "latitude_deg": 23.886999,
+      "longitude_deg": 91.240402,
+      "country_name": "India",
+      "city": "Agartala"
+    },
+    {
+      "name": "Bhavnagar Airport",
+      "ident": "VABV",
+      "icao_code": "VABV",
+      "latitude_deg": 21.752199173,
+      "longitude_deg": 72.1852035522,
+      "country_name": "India",
+      "city": "Bhavnagar"
+    },
+    {
+      "name": "Jabalpur Airport",
+      "ident": "VAJB",
+      "icao_code": "VAJB",
+      "latitude_deg": 23.177799,
+      "longitude_deg": 80.052002,
+      "country_name": "India",
+      "city": "Jabalpur"
+    },
+    {
+      "name": "Jorhat Airport",
+      "ident": "VEJT",
+      "icao_code": "VEJT",
+      "latitude_deg": 26.730456,
+      "longitude_deg": 94.175416,
+      "country_name": "India",
+      "city": "Jorhat"
+    },
+    {
+      "name": "Rajahmundry Airport",
+      "ident": "VORY",
+      "icao_code": "VORY",
+      "latitude_deg": 17.105799,
+      "longitude_deg": 81.813204,
+      "country_name": "India",
+      "city": "Madhurapudi"
+    },
+    {
+      "name": "Rajkot Airport",
+      "ident": "VARK",
+      "icao_code": "VARK",
+      "latitude_deg": 22.3092,
+      "longitude_deg": 70.779503,
+      "country_name": "India",
+      "city": "Rajkot"
+    },
+    {
+      "name": "Khajuraho Airport",
+      "ident": "VAKJ",
+      "icao_code": "",
+      "latitude_deg": 24.8172,
+      "longitude_deg": 79.918602,
+      "country_name": "India",
+      "city": "Khajuraho"
+    },
+    {
+      "name": "Nashik Airport",
+      "ident": "VAOZ",
+      "icao_code": "VAOZ",
+      "latitude_deg": 20.119101,
+      "longitude_deg": 73.912903,
+      "country_name": "India",
+      "city": "Nasik"
+    },
+    {
+      "name": "Dehradun Jolly Grant Airport",
+      "ident": "VIDN",
+      "icao_code": "VIDN",
+      "latitude_deg": 30.189243,
+      "longitude_deg": 78.176651,
+      "country_name": "India",
+      "city": "Dehradun (Jauligrant)"
+    },
+    {
+      "name": "Jamnagar Airport",
+      "ident": "VAJM",
+      "icao_code": "VAJM",
+      "latitude_deg": 22.465499877929688,
+      "longitude_deg": 70.01260375976562,
+      "country_name": "India",
+      "city": "Jamnagar"
+    },
+    {
+      "name": "Silchar Airport",
+      "ident": "VEKU",
+      "icao_code": "VEKU",
+      "latitude_deg": 24.9129009247,
+      "longitude_deg": 92.9786987305,
+      "country_name": "India",
+      "city": "Silchar"
+    },
+    {
+      "name": "Tiruchirappalli International Airport",
+      "ident": "VOTR",
+      "icao_code": "VOTR",
+      "latitude_deg": 10.766223,
+      "longitude_deg": 78.71774,
+      "country_name": "India",
+      "city": "Tiruchirappalli"
+    },
+    {
+      "name": "Agatti Airport",
+      "ident": "VOAT",
+      "icao_code": "VOAT",
+      "latitude_deg": 10.8237,
+      "longitude_deg": 72.176003,
+      "country_name": "India",
+      "city": "Agatti"
+    },
+    {
+      "name": "Lengpui Airport",
+      "ident": "VELP",
+      "icao_code": "VELP",
+      "latitude_deg": 23.840599,
+      "longitude_deg": 92.619698,
+      "country_name": "India",
+      "city": "Aizawl (Lengpui)"
+    },
+    {
+      "name": "Prayagraj Airport",
+      "ident": "VIAL",
+      "icao_code": "VEAB",
+      "latitude_deg": 25.4401,
+      "longitude_deg": 81.733902,
+      "country_name": "India",
+      "city": "Allahabad"
+    },
+    {
+      "name": "Darbhanga Airport",
+      "ident": "VEDH",
+      "icao_code": "VEDH",
+      "latitude_deg": 26.192801,
+      "longitude_deg": 85.916901,
+      "country_name": "India",
+      "city": "Darbhanga"
+    },
+    {
+      "name": "Gondia Airport",
+      "ident": "VA2C",
+      "icao_code": "VAGD",
+      "latitude_deg": 21.526817,
+      "longitude_deg": 80.290347,
+      "country_name": "India",
+      "city": "Gondia"
+    },
+    {
+      "name": "Kanpur Airport",
+      "ident": "VICX",
+      "icao_code": "",
+      "latitude_deg": 26.404301,
+      "longitude_deg": 80.410103,
+      "country_name": "India",
+      "city": "Kanpur"
+    },
+    {
+      "name": "Keshod Airport",
+      "ident": "VAKS",
+      "icao_code": "VAKS",
+      "latitude_deg": 21.317101,
+      "longitude_deg": 70.270401,
+      "country_name": "India",
+      "city": "Keshod"
+    },
+    {
+      "name": "Ambala Air Force Station",
+      "ident": "VIAM",
+      "icao_code": "",
+      "latitude_deg": 30.368099,
+      "longitude_deg": 76.816704,
+      "country_name": "India",
+      "city": "Ambala"
+    },
+    {
+      "name": "Sri Sathya Sai Airport",
+      "ident": "VOPN",
+      "icao_code": "VOPN",
+      "latitude_deg": 14.1492996216,
+      "longitude_deg": 77.7910995483,
+      "country_name": "India",
+      "city": "Puttaparthi"
+    },
+    {
+      "name": "Tezpur Airport",
+      "ident": "VETZ",
+      "icao_code": "VETZ",
+      "latitude_deg": 26.7091007232666,
+      "longitude_deg": 92.78469848632812,
+      "country_name": "India",
+      "city": ""
+    },
+    {
+      "name": "Belagavi Airport",
+      "ident": "VABM",
+      "icao_code": "VOBM",
+      "latitude_deg": 15.8593,
+      "longitude_deg": 74.618301,
+      "country_name": "India",
+      "city": "Belgaum"
+    },
+    {
+      "name": "Gaya Airport",
+      "ident": "VEGY",
+      "icao_code": "VEGY",
+      "latitude_deg": 24.744301,
+      "longitude_deg": 84.951202,
+      "country_name": "India",
+      "city": "Gaya"
+    },
+    {
+      "name": "Gwalior Airport",
+      "ident": "VIGR",
+      "icao_code": "VIGR",
+      "latitude_deg": 26.29330062866211,
+      "longitude_deg": 78.22779846191406,
+      "country_name": "India",
+      "city": "Gwalior"
+    },
+    {
+      "name": "Porbandar Airport",
+      "ident": "VAPR",
+      "icao_code": "VAPR",
+      "latitude_deg": 21.649524,
+      "longitude_deg": 69.656405,
+      "country_name": "India",
+      "city": "Porbandar"
+    },
+    {
+      "name": "Kazi Nazrul Islam Airport",
+      "ident": "VEDG",
+      "icao_code": "VEDG",
+      "latitude_deg": 23.6225,
+      "longitude_deg": 87.243,
+      "country_name": "India",
+      "city": "Durgapur"
+    },
+    {
+      "name": "Kandla Airport",
+      "ident": "VAKE",
+      "icao_code": "VAKE",
+      "latitude_deg": 23.1127,
+      "longitude_deg": 70.100304,
+      "country_name": "India",
+      "city": "Kandla"
+    },
+    {
+      "name": "Sonari Airport",
+      "ident": "VEJS",
+      "icao_code": "VEJS",
+      "latitude_deg": 22.813706,
+      "longitude_deg": 86.168981,
+      "country_name": "India",
+      "city": "Jamshedpur"
+    },
+    {
+      "name": "Kolhapur Airport",
+      "ident": "VAKP",
+      "icao_code": "VAKP",
+      "latitude_deg": 16.6647,
+      "longitude_deg": 74.289398,
+      "country_name": "India",
+      "city": "Kolhapur"
+    },
+    {
+      "name": "Shillong Airport",
+      "ident": "VEBI",
+      "icao_code": "VEBI",
+      "latitude_deg": 25.70359992980957,
+      "longitude_deg": 91.97869873046876,
+      "country_name": "India",
+      "city": "Shillong"
+    },
+    {
+      "name": "Jaisalmer Airport",
+      "ident": "VIJR",
+      "icao_code": "VIJR",
+      "latitude_deg": 26.8887,
+      "longitude_deg": 70.864998,
+      "country_name": "India",
+      "city": ""
+    },
+    {
+      "name": "Kishangarh Airport Ajmer",
+      "ident": "VIKG",
+      "icao_code": "VIKG",
+      "latitude_deg": 26.591007,
+      "longitude_deg": 74.812956,
+      "country_name": "India",
+      "city": "Ajmer (Kishangarh)"
+    },
+    {
+      "name": "Bilaspur Airport",
+      "ident": "VEBU",
+      "icao_code": "VEBU",
+      "latitude_deg": 21.9884,
+      "longitude_deg": 82.111,
+      "country_name": "India",
+      "city": "Bilaspur"
+    },
+    {
+      "name": "Hisar Airport",
+      "ident": "VIHR",
+      "icao_code": "VIHR",
+      "latitude_deg": 29.179399,
+      "longitude_deg": 75.755302,
+      "country_name": "India",
+      "city": "Hisar"
+    },
+    {
+      "name": "Kadapa Airport",
+      "ident": "VOCP",
+      "icao_code": "VOCP",
+      "latitude_deg": 14.513154,
+      "longitude_deg": 78.769183,
+      "country_name": "India",
+      "city": "Kadapa"
+    },
+    {
+      "name": "Shirdi Airport",
+      "ident": "VASD",
+      "icao_code": "VASD",
+      "latitude_deg": 19.688752,
+      "longitude_deg": 74.377354,
+      "country_name": "India",
+      "city": "Kakadi"
+    },
+    {
+      "name": "Kangra Airport",
+      "ident": "VIGG",
+      "icao_code": "VIGG",
+      "latitude_deg": 32.164902,
+      "longitude_deg": 76.263018,
+      "country_name": "India",
+      "city": "Kangra"
+    },
+    {
+      "name": "Moradabad Airport",
+      "ident": "VIMB",
+      "icao_code": "",
+      "latitude_deg": 28.81746,
+      "longitude_deg": 78.92187,
+      "country_name": "India",
+      "city": "Moradabad"
+    },
+    {
+      "name": "Pathankot Airport",
+      "ident": "VIPK",
+      "icao_code": "VIPK",
+      "latitude_deg": 32.233611,
+      "longitude_deg": 75.634444,
+      "country_name": "India",
+      "city": "Pathankot"
+    },
+    {
+      "name": "Rewa Airport, Chorhata, REWA",
+      "ident": "VA1G",
+      "icao_code": "",
+      "latitude_deg": 24.503401,
+      "longitude_deg": 81.220299,
+      "country_name": "India",
+      "city": "Rewa"
+    },
+    {
+      "name": "Dhanbad Airport",
+      "ident": "VEDB",
+      "icao_code": "VEDB",
+      "latitude_deg": 23.834,
+      "longitude_deg": 86.425301,
+      "country_name": "India",
+      "city": ""
+    },
+    {
+      "name": "Sirsa Air Force Station",
+      "ident": "VISA",
+      "icao_code": "",
+      "latitude_deg": 29.5606,
+      "longitude_deg": 75.006104,
+      "country_name": "India",
+      "city": ""
+    },
+    {
+      "name": "Bhatinda Air Force Station",
+      "ident": "VIBT",
+      "icao_code": "VIBT",
+      "latitude_deg": 30.2701,
+      "longitude_deg": 74.755798,
+      "country_name": "India",
+      "city": ""
+    },
+    {
+      "name": "Panagarh Air Force Station",
+      "ident": "VEPH",
+      "icao_code": "",
+      "latitude_deg": 23.4743003845,
+      "longitude_deg": 87.4274978638,
+      "country_name": "India",
+      "city": ""
+    },
+    {
+      "name": "Bellary Airport",
+      "ident": "VOBI",
+      "icao_code": "VOBI",
+      "latitude_deg": 15.162799835205078,
+      "longitude_deg": 76.88279724121094,
+      "country_name": "India",
+      "city": "Bellary"
+    },
+    {
+      "name": "Bidar Airport / Bidar Air Force Station",
+      "ident": "VOBR",
+      "icao_code": "VOBR",
+      "latitude_deg": 17.9081,
+      "longitude_deg": 77.487099,
+      "country_name": "India",
+      "city": "Bidar"
+    },
+    {
+      "name": "Dundigul Air Force Academy",
+      "ident": "VODG",
+      "icao_code": "",
+      "latitude_deg": 17.627199173,
+      "longitude_deg": 78.4033966064,
+      "country_name": "India",
+      "city": "Hyderabad"
+    },
+    {
+      "name": "Kailashahar Airport",
+      "ident": "VEKR",
+      "icao_code": "VEKR",
+      "latitude_deg": 24.308657,
+      "longitude_deg": 92.00768,
+      "country_name": "India",
+      "city": "Kailashahar"
+    },
+    {
+      "name": "Kota Airport",
+      "ident": "VIKO",
+      "icao_code": "VIKO",
+      "latitude_deg": 25.160200119,
+      "longitude_deg": 75.84559631350001,
+      "country_name": "India",
+      "city": "Kota"
+    },
+    {
+      "name": "Safdarjung Airport",
+      "ident": "VIDD",
+      "icao_code": "VIDD",
+      "latitude_deg": 28.585453,
+      "longitude_deg": 77.203563,
+      "country_name": "India",
+      "city": "New Delhi"
+    },
+    {
+      "name": "Rourkela Airport",
+      "ident": "VERK",
+      "icao_code": "VERK",
+      "latitude_deg": 22.256571,
+      "longitude_deg": 84.815193,
+      "country_name": "India",
+      "city": "Rourkela"
+    },
+    {
+      "name": "Udhampur Air Force Station",
+      "ident": "VIUX",
+      "icao_code": "",
+      "latitude_deg": 32.902152,
+      "longitude_deg": 75.155709,
+      "country_name": "India",
+      "city": "Udhampur"
+    },
+    {
+      "name": "Dimapur Airport",
+      "ident": "VEMR",
+      "icao_code": "VEMR",
+      "latitude_deg": 25.8838996887,
+      "longitude_deg": 93.7711029053,
+      "country_name": "India",
+      "city": "Dimapur"
+    },
+    {
+      "name": "Lilabari North Lakhimpur Airport",
+      "ident": "VELR",
+      "icao_code": "VELR",
+      "latitude_deg": 27.295682,
+      "longitude_deg": 94.097266,
+      "country_name": "India",
+      "city": "Lilabari"
+    },
+    {
+      "name": "Maa Mahamaya Airport",
+      "ident": "IN-0393",
+      "icao_code": "VEAP",
+      "latitude_deg": 22.98753,
+      "longitude_deg": 83.19612,
+      "country_name": "India",
+      "city": "Ambikapur"
+    },
+    {
+      "name": "Bareilly Air Force Station",
+      "ident": "VIBY",
+      "icao_code": "VIBY",
+      "latitude_deg": 28.4221,
+      "longitude_deg": 79.450798,
+      "country_name": "India",
+      "city": "Bareilly"
+    },
+    {
+      "name": "Sindhudurg Airport",
+      "ident": "IN-0107",
+      "icao_code": "VOSR",
+      "latitude_deg": 16.002552,
+      "longitude_deg": 73.529846,
+      "country_name": "India",
+      "city": "Chipi"
+    },
+    {
+      "name": "Ayodhya Airport",
+      "ident": "IN-0025",
+      "icao_code": "VEAY",
+      "latitude_deg": 26.751283,
+      "longitude_deg": 82.155295,
+      "country_name": "India",
+      "city": "Faizabad"
+    },
+    {
+      "name": "Gorakhpur Airport",
+      "ident": "VEGK",
+      "icao_code": "VEGK",
+      "latitude_deg": 26.7397003174,
+      "longitude_deg": 83.4496994019,
+      "country_name": "India",
+      "city": "Gorakhpur"
+    },
+    {
+      "name": "Itanagar Donyi Polo Hollongi Airport",
+      "ident": "IN-0308",
+      "icao_code": "",
+      "latitude_deg": 26.96683,
+      "longitude_deg": 93.638792,
+      "country_name": "India",
+      "city": "Hollongi"
+    },
+    {
+      "name": "Hubli Airport",
+      "ident": "VAHB",
+      "icao_code": "VOHB",
+      "latitude_deg": 15.3617,
+      "longitude_deg": 75.0849,
+      "country_name": "India",
+      "city": "Hubli"
+    },
+    {
+      "name": "Murod Kond Airport",
+      "ident": "VALT",
+      "icao_code": "VALT",
+      "latitude_deg": 18.411501,
+      "longitude_deg": 76.464699,
+      "country_name": "India",
+      "city": "Latur"
+    },
+    {
+      "name": "Nanded Airport",
+      "ident": "VAND",
+      "icao_code": "",
+      "latitude_deg": 19.1833,
+      "longitude_deg": 77.316704,
+      "country_name": "India",
+      "city": "Nanded"
+    },
+    {
+      "name": "Kurnool Airport",
+      "ident": "VOKU",
+      "icao_code": "VOKU",
+      "latitude_deg": 15.716288,
+      "longitude_deg": 78.16923,
+      "country_name": "India",
+      "city": "Orvakal"
+    },
+    {
+      "name": "Pantnagar Airport",
+      "ident": "VIPT",
+      "icao_code": "VIPT",
+      "latitude_deg": 29.0334,
+      "longitude_deg": 79.473701,
+      "country_name": "India",
+      "city": "Pantnagar"
+    },
+    {
+      "name": "Pondicherry Airport",
+      "ident": "VOPC",
+      "icao_code": "VOPC",
+      "latitude_deg": 11.968,
+      "longitude_deg": 79.812,
+      "country_name": "India",
+      "city": "Puducherry (Pondicherry)"
+    },
+    {
+      "name": "Along Airport",
+      "ident": "VEAN",
+      "icao_code": "VEAN",
+      "latitude_deg": 28.17530059814453,
+      "longitude_deg": 94.802001953125,
+      "country_name": "India",
+      "city": ""
+    },
+    {
+      "name": "Ratnagiri Airport",
+      "ident": "VARG",
+      "icao_code": "VARG",
+      "latitude_deg": 17.013599,
+      "longitude_deg": 73.327797,
+      "country_name": "India",
+      "city": ""
+    },
+    {
+      "name": "Ludhiana Airport",
+      "ident": "VILD",
+      "icao_code": "VILD",
+      "latitude_deg": 30.854700088500977,
+      "longitude_deg": 75.95259857177734,
+      "country_name": "India",
+      "city": ""
+    },
+    {
+      "name": "Akola Airport",
+      "ident": "VAAK",
+      "icao_code": "VAAK",
+      "latitude_deg": 20.698931,
+      "longitude_deg": 77.056883,
+      "country_name": "India",
+      "city": "Akola"
+    },
+    {
+      "name": "Jakkur Aerodrome",
+      "ident": "IN-0011",
+      "icao_code": "",
+      "latitude_deg": 13.07674,
+      "longitude_deg": 77.597645,
+      "country_name": "India",
+      "city": "Bengaluru"
+    },
+    {
+      "name": "Nal Airport",
+      "ident": "VIBK",
+      "icao_code": "VIBK",
+      "latitude_deg": 28.070601,
+      "longitude_deg": 73.207199,
+      "country_name": "India",
+      "city": "Bikaner"
+    },
+    {
+      "name": "Campbell Bay Airport / INS Baaz",
+      "ident": "VO94",
+      "icao_code": "",
+      "latitude_deg": 7.01304,
+      "longitude_deg": 93.922798,
+      "country_name": "India",
+      "city": "Campbell Bay"
+    },
+    {
+      "name": "Daman Airport",
+      "ident": "VADN",
+      "icao_code": "VADN",
+      "latitude_deg": 20.434401,
+      "longitude_deg": 72.843201,
+      "country_name": "India",
+      "city": "Daman"
+    },
+    {
+      "name": "Car Nicobar Air Force Base",
+      "ident": "VOCX",
+      "icao_code": "VOCX",
+      "latitude_deg": 9.153056,
+      "longitude_deg": 92.819273,
+      "country_name": "India",
+      "city": "IAF Camp"
+    },
+    {
+      "name": "Hashimara Air Force Station",
+      "ident": "VEHX",
+      "icao_code": "VEHX",
+      "latitude_deg": 26.698299,
+      "longitude_deg": 89.369102,
+      "country_name": "India",
+      "city": "Jalpaiguri"
+    },
+    {
+      "name": "Kushinagar International Airport",
+      "ident": "VEKI",
+      "icao_code": "VEKI",
+      "latitude_deg": 26.776534,
+      "longitude_deg": 83.889214,
+      "country_name": "India",
+      "city": "Kushinagar"
+    },
+    {
+      "name": "Muzaffarpur Airport",
+      "ident": "VEMZ",
+      "icao_code": "VEMZ",
+      "latitude_deg": 26.119101,
+      "longitude_deg": 85.313698,
+      "country_name": "India",
+      "city": "Muzaffarpur"
+    },
+    {
+      "name": "Salem Airport",
+      "ident": "VOSM",
+      "icao_code": "VOSM",
+      "latitude_deg": 11.78330039978,
+      "longitude_deg": 78.06559753418,
+      "country_name": "India",
+      "city": "Salem"
+    },
+    {
+      "name": "Rashtrakavi Kuvempu Airport",
+      "ident": "IN-0301",
+      "icao_code": "VOSH",
+      "latitude_deg": 13.858024,
+      "longitude_deg": 75.618868,
+      "country_name": "India",
+      "city": "Shimoga"
+    },
+    {
+      "name": "Solapur Airport",
+      "ident": "VASL",
+      "icao_code": "VASL",
+      "latitude_deg": 17.6280002594,
+      "longitude_deg": 75.93479919430001,
+      "country_name": "India",
+      "city": "Solapur"
+    },
+    {
+      "name": "Sant Gadge Baba Yavatmal Airport",
+      "ident": "IN-0369",
+      "icao_code": "",
+      "latitude_deg": 20.395781,
+      "longitude_deg": 78.216272,
+      "country_name": "India",
+      "city": "Yavatmal"
+    },
+    {
+      "name": "Ziro Airport",
+      "ident": "VEZO",
+      "icao_code": "VEZO",
+      "latitude_deg": 27.588301,
+      "longitude_deg": 93.828102,
+      "country_name": "India",
+      "city": "Ziro"
+    },
+    {
+      "name": "Noida International Airport",
+      "ident": "IN-0392",
+      "icao_code": "VIND",
+      "latitude_deg": 28.179868,
+      "longitude_deg": 77.611843,
+      "country_name": "India",
+      "city": "Gautam Buddha Nagar"
+    }
+  ]
