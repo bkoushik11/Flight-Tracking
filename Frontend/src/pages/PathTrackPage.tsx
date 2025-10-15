@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, memo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { FlightMap } from '../components/FlightMap';
 import { MapLayerProvider } from '../components/Layers';
 import { Flight } from '../types/flight';
@@ -6,7 +6,7 @@ import { Flight } from '../types/flight';
 import { Position as PastTrackPosition } from '../components/PastTrackLayer';
 import { fetchPositions, listRecordedFlightIds, deleteRecordedFlight } from '../services/flightService';
 import { Play, Pause, RotateCcw, ArrowLeft, Trash2 } from 'lucide-react';
-// import L from 'leaflet';
+import L from 'leaflet';
 
 interface PathTrackPageProps {
   flights: Flight[];
@@ -21,13 +21,10 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playIndex, setPlayIndex] = useState<number>(0);
   const [positions, setPositions] = useState<PastTrackPosition[]>([]);
-  // const [drawnRectangles, setDrawnRectangles] = useState<L.LatLngBounds[]>([]);
+  const [drawnRectangles, setDrawnRectangles] = useState<L.LatLngBounds[]>([]);
   const [availableFlightIds, setAvailableFlightIds] = useState<string[]>([]);
   const [activeFlightId, setActiveFlightId] = useState<string>('');
   
-  // Refs for animation frame management
-  const animationFrameIdRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number | null>(null);
 
   // Load recorded flight ids
   useEffect(() => {
@@ -72,54 +69,15 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
     return () => { cancelled = true; };
   }, [activeFlightId]);
 
-  // Cleanup animation frame on unmount
+  // Simple playback effect advancing through positions
   useEffect(() => {
-    return () => {
-      if (animationFrameIdRef.current) {
-        cancelAnimationFrame(animationFrameIdRef.current);
-      }
-    };
-  }, []);
-
-  // Playback effect using requestAnimationFrame (1 step every ~800ms)
-  useEffect(() => {
-    // Clean up any existing animation frame
-    if (animationFrameIdRef.current) {
-      cancelAnimationFrame(animationFrameIdRef.current);
-      animationFrameIdRef.current = null;
-    }
-    startTimeRef.current = null;
-
-    // Exit if not playing or no positions
     if (!showPastTrack || !isPlaying || positions.length === 0) return;
-
-    const animate = (timestamp: number) => {
-      if (!startTimeRef.current) startTimeRef.current = timestamp;
-
-      const elapsed = timestamp - startTimeRef.current;
-      const stepDuration = 800; // ms per step
-
-      const nextIndex = Math.floor(elapsed / stepDuration);
-
-      if (nextIndex < positions.length) {
-        setPlayIndex(nextIndex);
-        animationFrameIdRef.current = requestAnimationFrame(animate);
-      } else {
-        setIsPlaying(false);
-      }
-    };
-
-    animationFrameIdRef.current = requestAnimationFrame(animate);
-    
-    // Cleanup function for this effect
-    return () => {
-      if (animationFrameIdRef.current) {
-        cancelAnimationFrame(animationFrameIdRef.current);
-        animationFrameIdRef.current = null;
-      }
-      startTimeRef.current = null;
-    };
-  }, [isPlaying, showPastTrack, positions]);
+    if (playIndex >= positions.length - 1) return;
+    const id = setInterval(() => {
+      setPlayIndex((idx) => Math.min(idx + 1, positions.length - 1));
+    }, 800);
+    return () => clearInterval(id);
+  }, [showPastTrack, isPlaying, playIndex, positions.length]);
 
   const handleReplay = () => {
     setPlayIndex(0);
@@ -132,9 +90,9 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
     : null;
 
   // Handle rectangle drawing
-  // const handleRectangleDrawn = useCallback((bounds: L.LatLngBounds) => {
-  //   setDrawnRectangles(prev => [...prev, bounds]);
-  // }, []);
+  const handleRectangleDrawn = useCallback((bounds: L.LatLngBounds) => {
+    setDrawnRectangles(prev => [...prev, bounds]);
+  }, []);
 
   // Handle flight click (minimal functionality for path track page)
   const handleFlightClick = useCallback((flight: Flight) => {
@@ -251,6 +209,20 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
             
           </div>
 
+          {/* Drawn Rectangles Info */}
+          {drawnRectangles.length > 0 && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000]">
+              <div className="bg-slate-900/90 backdrop-blur-md border border-blue-400/40 rounded-lg px-3 py-2 shadow-lg">
+                <div className="text-blue-300 text-sm font-medium">
+                  Drawn Areas: {drawnRectangles.length}
+                </div>
+                <div className="text-blue-200 text-xs">
+                  Use the draw tool to create rectangles
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Playback Controls - Bottom Center */}
           {showPastTrack && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000]">
@@ -293,4 +265,4 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
   );
 };
 
-export default memo(PathTrackPage);
+export default PathTrackPage;

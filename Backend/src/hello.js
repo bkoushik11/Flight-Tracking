@@ -72,7 +72,9 @@
 //         on_ground: f[8],
 //         velocity: f[9],
 //         heading: f[10],
-//         vertical_rate: f[11]
+//         vertical_rate: f[11],
+//         estDepartureAirport: f[12],
+//         estArrivalAirport: f[13]
 //       }));
 
 //     res.json({

@@ -149,7 +149,7 @@ const FlightMarkers: React.FC<{
     <>
       {flights.map(flight => (
         <FlightMarker 
-          key={flight.id} 
+          key={`${flight.id}-${selectedFlightId === flight.id ? 'selected' : 'normal'}`}
           flight={flight} 
           onClick={onFlightClick} 
           selectedFlightId={selectedFlightId}
