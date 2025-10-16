@@ -88,7 +88,7 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
     
     const animate = (timestamp: number) => {
       // Move to next position based on playback speed (faster interval allows animation to complete)
-      const interval = 200000 / playbackSpeed;
+      const interval = 20000 / playbackSpeed;
       if (timestamp - lastUpdate > interval) {
         setPlayIndex((idx) => Math.min(idx + 1, positions.length - 1));
         lastUpdate = timestamp;
@@ -177,51 +177,59 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
           {/* Controls Panel - Top Right */}
           <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-3">
             
-            {/* Recorded Flights Selector (with inline delete per flight) */}
+            {/* Recorded Flights Selector (as custom dropdown) */}
             <div className="bg-slate-900/90 backdrop-blur-md border border-emerald-400/40 rounded-lg shadow-lg p-2">
               <div className="text-emerald-300 text-sm font-medium mb-1">Recorded Flights</div>
-              <div className="flex gap-2 flex-wrap max-w-[280px]">
-                {availableFlightIds.length === 0 && (
-                  <div className="text-slate-400 text-xs">No recordings yet</div>
-                )}
-                {availableFlightIds.map(fid => (
-                  <div key={fid} className="inline-flex items-center gap-1">
-                    <button
-                      onClick={() => setActiveFlightId(fid)}
-                      className={`px-2 py-1 text-xs rounded border transition-all ${activeFlightId === fid ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/50' : 'bg-emerald-500/10 text-emerald-300 border-emerald-400/30 hover:bg-emerald-500/20'}`}
-                      title={fid}
+              {availableFlightIds.length === 0 ? (
+                <div className="text-slate-400 text-xs p-2">No recordings yet</div>
+              ) : (
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {availableFlightIds.map((fid, index) => (
+                    <div 
+                      key={fid} 
+                      className={`flex items-center justify-between p-2 rounded transition-all ${activeFlightId === fid ? 'bg-emerald-500/20 border border-emerald-400/30' : 'hover:bg-slate-700/50'}`}
                     >
-                      {fid}
-                    </button>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await deleteRecordedFlight(fid);
-                          // If the deleted one is active, reset selection
-                          let nextActive = activeFlightId;
-                          if (activeFlightId === fid) {
-                            nextActive = '';
+                      <button
+                        onClick={() => setActiveFlightId(fid)}
+                        className="flex-1 text-left flex items-center gap-2"
+                      >
+                        <span className="text-emerald-300 font-mono text-xs">{index + 1}.</span>
+                        <div>
+                          <div className="text-emerald-200 text-sm font-medium">{fid}</div>
+                          <div className="text-slate-400 text-xs">Time: {new Date().toLocaleTimeString()}</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await deleteRecordedFlight(fid);
+                            // If the deleted one is active, reset selection
+                            let nextActive = activeFlightId;
+                            if (activeFlightId === fid) {
+                              nextActive = '';
+                            }
+                            const res = await listRecordedFlightIds();
+                            setAvailableFlightIds(res.flightIds || []);
+                            // No recorded times to reset
+                            setActiveFlightId(nextActive || (res.flightIds?.[0] || ''));
+                            if (activeFlightId === fid) {
+                              setPositions([]);
+                              setPlayIndex(0);
+                            }
+                          } catch (e) {
+                            console.error('Failed to delete recorded flight', e);
                           }
-                          const res = await listRecordedFlightIds();
-                          setAvailableFlightIds(res.flightIds || []);
-                          setActiveFlightId(nextActive || (res.flightIds?.[0] || ''));
-                          if (activeFlightId === fid) {
-                            setPositions([]);
-                            setPlayIndex(0);
-                          }
-                        } catch (e) {
-                          console.error('Failed to delete recorded flight', e);
-                        }
-                      }}
-                      className="p-1 text-red-300 hover:text-red-200 border border-red-400/30 rounded"
-                      aria-label={`Delete ${fid}`}
-                      title={`Delete ${fid}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+                        }}
+                        className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-full transition-all"
+                        aria-label={`Delete ${fid}`}
+                        title={`Delete ${fid}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             
             {/* Path Track Toggle and Delete */}
@@ -280,20 +288,25 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({
                   <Gauge className="h-4 w-4 text-amber-200" />
                   <input
                     type="range"
-                    min="0.125"
-                    max="2"
-                    step="0.125"
-                    value={playbackSpeed}
-                    onChange={(e) => setPlaybackSpeed(parseFloat(e.target.value))}
-                    className="w-20 accent-amber-400"
+                    min="0"
+                    max="4"
+                    step="1"
+                    value={[0.25, 0.5, 1, 2, 4].indexOf(playbackSpeed)}
+                    onChange={(e) => {
+                      const speeds = [0.25, 0.5, 1, 2, 4];
+                      setPlaybackSpeed(speeds[parseInt(e.target.value)]);
+                    }}
+                    className="w-28 accent-amber-400"
                   />
                   <span className="text-amber-200 text-xs w-10">{playbackSpeed}x</span>
                 </div>
-                <div className="text-amber-200 text-xs font-mono">
-                  {Math.min(playIndex + 1, positions.length)} / {positions.length}
-                </div>
-                <div className="w-40 h-2 bg-slate-700 rounded overflow-hidden">
-                  <div className="h-full bg-amber-400" style={{ width: `${positions.length ? ((Math.min(playIndex + 1, positions.length) / positions.length) * 100) : 0}%` }} />
+                <div className="flex items-center gap-2">
+                  <div className="text-amber-200 text-xs font-mono min-w-[70px]">
+                    {Math.min(playIndex + 1, positions.length)} / {positions.length}
+                  </div>
+                  <div className="w-32 h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-400 rounded-full" style={{ width: `${positions.length ? ((Math.min(playIndex + 1, positions.length) / positions.length) * 100) : 0}%` }} />
+                  </div>
                 </div>
                 {showPastTrack && currentPlaybackPos && (
                   <div className="ml-2 text-amber-200 text-[11px] font-mono whitespace-nowrap">

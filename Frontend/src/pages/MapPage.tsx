@@ -5,6 +5,7 @@ import { Layers, MapLayerProvider } from '../components/Layers';
 import { LeftPanel } from '../components/LeftPanel';
 import { Flight } from '../types/flight';
 import { INDIAN_AIRPORTS } from '../components/IndianAirports';
+import { Route } from 'lucide-react';
 import L from 'leaflet';
 import { addRecordedPosition, startRecording, stopRecording } from '../services/flightService';
 
@@ -270,12 +271,13 @@ const MapPageInner: React.FC<MapPageProps> = ({
           
           {/* PathTrack Nav Button - use Link to ensure reliable SPA navigation */}
           <div className="absolute top-4 right-2 z-[1000] mb-2 pointer-events-auto">
-            <Link
-              to="/pathtrack"
-              className="px-3 py-2 bg-slate-900/90 backdrop-blur-md border border-cyan-400/40 rounded-md shadow-lg text-yellow-300 hover:bg-cyan-500/20 transition-all text-sm font-medium"
-              title="Go to Path Track"
+          <Link
+          to="/pathtrack"
+          className="flex items-center justify-center w-10 h-10 bg-slate-900/90 backdrop-blur-md 
+               border border-cyan-400/40 rounded-lg shadow-lg transition-all duration-200"
+              
             >
-              Path Track
+              <Route className="h-5 w-5" />
             </Link>
           </div>
           
