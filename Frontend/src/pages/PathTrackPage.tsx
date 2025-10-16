@@ -238,7 +238,7 @@ const PathTrackPage: React.FC<PathTrackPageProps> = ({ onBack }) => {
                       Start time: {new Date(positions[0].timestamp).toLocaleTimeString()}
                     </div>
                     <div className="text-amber-200 text-[11px] font-mono">
-                      Last time: {new Date(positions[positions.length - 1].timestamp).toLocaleTimeString()}
+                      End time: {new Date(positions[positions.length - 1].timestamp).toLocaleTimeString()}
                     </div>
                   </div>
                 )}
