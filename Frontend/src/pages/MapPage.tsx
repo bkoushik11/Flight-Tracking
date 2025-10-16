@@ -252,7 +252,6 @@ const MapPageInner: React.FC<MapPageProps> = ({
             pastTrack={undefined}
             onRectangleDrawn={handleRectangleDrawn}
             showLeftPanel={showLeftPanel}
-            onBackToMap={onBackToMap}
           />
           
           {/* Logout Button - Positioned at top right (full screen) or top left (split screen) */}

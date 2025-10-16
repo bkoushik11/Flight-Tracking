@@ -29,7 +29,6 @@ interface FlightMapProps {
   pastTrack?: { positions: PastTrackPosition[]; isVisible: boolean; flightId: string; currentIndex?: number; isPlaying?: boolean; stepDurationMs?: number };
   onRectangleDrawn?: (bounds: L.LatLngBounds) => void;
   showLeftPanel?: boolean;
-  onBackToMap?: () => void;
 }
 
 // Component to handle map events
@@ -79,13 +78,14 @@ const createAirplaneIcon = (heading: number, isSelected?: boolean) => {
         display: flex; 
         align-items: center; 
         justify-content: center;
-        transform: rotate(${heading}deg);
+        transform: rotate(${heading-85}deg);
       ">
         <div style="
           font-size: 24px;
           color: ${color};
           font-weight: bold;
           text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+          
         ">✈</div>
       </div>
     `,
@@ -168,8 +168,7 @@ const FlightMapInner: React.FC<FlightMapProps> = ({
   selectedFlight,
   pastTrack,
   onRectangleDrawn,
-  showLeftPanel,
-  onBackToMap
+  showLeftPanel
 }) => {
   const { activeLayer } = useMapLayer();
   
@@ -205,7 +204,6 @@ const FlightMapInner: React.FC<FlightMapProps> = ({
         selectedFlight={selectedFlight} 
         isActive={!!selectedFlight} 
         showLeftPanel={showLeftPanel}
-        onBackToMap={onBackToMap}
       />
       {onRectangleDrawn && (
         <DrawControl onRectangleDrawn={onRectangleDrawn} autoZoom={true} />

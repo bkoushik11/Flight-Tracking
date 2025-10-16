@@ -96,9 +96,9 @@ const CentreFlight: React.FC<CentreFlightProps> = ({ selectedFlight, isActive, s
     }
   }, [isActive]);
 
-  // Handle back to map functionality - reset to initial view when no selection
+  // Handle back to map functionality - reset to initial view
   useEffect(() => {
-    if (!isActive && !selectedFlight) {
+    if (onBackToMap && !isActive && !selectedFlight) {
       // Reset to initial India view (zoom level 5) when going back to map
       try {
         map.setView([20.5937, 78.9629], 5, { 
@@ -116,7 +116,7 @@ const CentreFlight: React.FC<CentreFlightProps> = ({ selectedFlight, isActive, s
         console.error('Error resetting map to initial view:', error);
       }
     }
-  }, [isActive, selectedFlight, map]);
+  }, [isActive, selectedFlight, onBackToMap, map]);
 
   // Handle panel state changes - ensure map resizes properly
   useEffect(() => {

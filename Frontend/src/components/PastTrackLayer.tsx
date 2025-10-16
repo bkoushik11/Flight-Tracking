@@ -33,7 +33,7 @@ const createStartPlaneIcon = (heading: number) => {
         display: flex;
         align-items: center;
         justify-content: center;
-        transform: rotate(${heading - 90}deg);
+        transform: rotate(${heading-85}deg);
         background: rgba(16,185,129,0.08);
         border-radius: 9999px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.25);
@@ -43,6 +43,7 @@ const createStartPlaneIcon = (heading: number) => {
           color: #10b981;
           font-weight: bold;
           text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+          transform: rotate(90deg);
         ">✈</div>
       </div>
     `,
@@ -89,7 +90,7 @@ export const PastTrackLayer: React.FC<PastTrackLayerProps> = ({
   showStartPlane = true,
   currentIndex,
   isPlaying = false,
-  stepDurationMs = 800
+  stepDurationMs = 600
 }) => {
   const map = useMap();
   const polylineRef = useRef<L.Polyline | null>(null);
@@ -99,6 +100,10 @@ export const PastTrackLayer: React.FC<PastTrackLayerProps> = ({
   const animStartTimeRef = useRef<number | null>(null);
   const fromIdxRef = useRef<number>(0);
   const toIdxRef = useRef<number>(0);
+  
+  // FIXED: Add refs to track animation state
+  const currentIndexRef = useRef<number>(0);
+  const isPlayingRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!isVisible || positions.length === 0) {
@@ -184,8 +189,12 @@ export const PastTrackLayer: React.FC<PastTrackLayerProps> = ({
   useEffect(() => {
     if (!isVisible || positions.length === 0) return;
 
+    // FIXED: Update refs and check validity
+    currentIndexRef.current = typeof currentIndex === 'number' ? currentIndex : 0;
+    isPlayingRef.current = isPlaying;
+
     const clampIndex = (i: number) => Math.max(0, Math.min(i, positions.length - 1));
-    const idx = typeof currentIndex === 'number' ? clampIndex(currentIndex) : 0;
+    const idx = clampIndex(currentIndexRef.current);
     const nextIdx = clampIndex(idx + 1);
 
     // Cancel any running animation on change
@@ -232,6 +241,12 @@ export const PastTrackLayer: React.FC<PastTrackLayerProps> = ({
     if (delta < -180) delta += 360;
 
     const animate = (ts: number) => {
+      // FIXED: Check if animation is still valid
+      if (currentIndexRef.current !== idx || !isPlayingRef.current) {
+        placeAtIndex(currentIndexRef.current);
+        return; // Stop invalid animation
+      }
+      
       if (animStartTimeRef.current === null) animStartTimeRef.current = ts;
       const elapsed = ts - (animStartTimeRef.current || 0);
       const duration = Math.max(100, stepDurationMs);
@@ -251,7 +266,8 @@ export const PastTrackLayer: React.FC<PastTrackLayerProps> = ({
         movingPlaneRef.current.setIcon(icon);
       }
 
-      if (tRaw < 1 && isPlaying) {
+      // FIXED: Only continue if still valid
+      if (tRaw < 1 && currentIndexRef.current === idx && isPlayingRef.current) {
         animRef.current = requestAnimationFrame(animate);
       } else {
         // Snap to end to avoid drift
