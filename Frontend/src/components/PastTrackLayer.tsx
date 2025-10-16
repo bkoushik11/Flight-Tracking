@@ -33,7 +33,7 @@ const createStartPlaneIcon = (heading: number) => {
         display: flex;
         align-items: center;
         justify-content: center;
-        transform: rotate(${heading+180}deg);
+        transform: rotate(${heading+178}deg);
         background: rgba(16,185,129,0.08);
         border-radius: 9999px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.25);
